@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CV XML-zu-PDF Hochpräzisions-Konverter v6</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --background-color: #f4f6f7;
+            --text-color: #333;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--background-color);
+            color: var(--text-color);
+        }
+
+        .converter-dashboard {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 25px 20px;
+            text-align: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+        }
+
+        .upload-box {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px dashed rgba(255, 255, 255, 0.3);
+            padding: 25px;
+            border-radius: 8px;
+            max-width: 550px;
+            margin: 15px auto;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .upload-box:hover {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: var(--secondary-color);
+        }
+
+        .btn-action {
+            background-color: var(--secondary-color);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 10px;
+            display: none;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        .btn-action:hover { background-color: #2980b9; }
+
+        .preview-wrapper {
+            display: flex;
+            justify-content: center;
+            padding: 40px 20px;
+        }
+
+        /* --- A4-PRINT-LAYOUT --- */
+        #resume-render-target {
+            width: 210mm;
+            min-height: 297mm;
+            background: white;
+            padding: 20mm 15mm;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            box-sizing: border-box;
+            display: none;
+        }
+
+        .resume-header {
+            display: table;
+            width: 100%;
+            border-bottom: 3px solid var(--primary-color);
+            padding-bottom: 20px;
+            margin-bottom: 25px;
+        }
+
+        .header-cell-img {
+            display: table-cell;
+            width: 35mm;
+            vertical-align: middle;
+        }
+
+        .resume-profile-img {
+            width: 30mm;
+            height: 40mm;
+            object-fit: cover;
+            border: 1px solid #bdc3c7;
+            border-radius: 2px;
+            display: block;
+        }
+
+        .header-cell-text {
+            display: table-cell;
+            vertical-align: middle;
+            padding-left: 5mm;
+        }
+
+        .resume-title h1 {
+            margin: 0;
+            color: var(--primary-color);
+            font-size: 24pt;
+            letter-spacing: -0.5px;
+        }
+
+        .resume-info {
+            font-size: 10pt;
+            color: #555;
+            margin-top: 8px;
+            line-height: 1.5;
+        }
+
+        .resume-section {
+            margin-bottom: 25px;
+        }
+
+        .resume-section h2 {
+            color: var(--primary-color);
+            border-bottom: 1.5px solid var(--primary-color);
+            padding-bottom: 4px;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            font-size: 12pt;
+            letter-spacing: 0.8px;
+        }
+
+        .resume-item {
+            display: table;
+            width: 100%;
+            margin-bottom: 14px;
+        }
+
+        .resume-item-date {
+            display: table-cell;
+            width: 35mm;
+            font-weight: 600;
+            color: var(--primary-color);
+            font-size: 10pt;
+            vertical-align: top;
+            padding-right: 5mm;
+        }
+
+        .resume-item-content {
+            display: table-cell;
+            vertical-align: top;
+        }
+
+        .resume-item-title {
+            font-weight: 700;
+            color: #2c3e50;
+            font-size: 10.5pt;
+            margin-bottom: 2px;
+        }
+
+        .resume-item-sub {
+            font-style: italic;
+            color: #666;
+            margin-bottom: 5px;
+            font-size: 9.5pt;
+        }
+
+        .project-list {
+            margin: 6px 0 0 0;
+            padding-left: 15px;
+        }
+
+        .project-list li {
+            margin-bottom: 8px;
+            font-size: 9.5pt;
+        }
+
+        .preview-project-title { font-weight: bold; color: #333; }
+        .preview-project-date { font-style: italic; color: #7f8c8d; font-size: 9pt; margin-left: 4px; }
+        .preview-project-desc { margin: 2px 0 0 0; color: #555; line-height: 1.4; }
+        .personal-project-desc { margin: 5px 0 0 0; font-size: 9.5pt; color: #444; line-height: 1.45; white-space: pre-line; }
+
+        .skill-category { margin-bottom: 10px; }
+        .skill-category-title { font-weight: bold; font-size: 10pt; color: var(--primary-color); margin-bottom: 4px; }
+        .skills-container { font-size: 9.5pt; color: #444; line-height: 1.4; }
+
+        @media print {
+            body { background: white; }
+            .converter-dashboard { display: none; }
+            .preview-wrapper { padding: 0; }
+            #resume-render-target { box-shadow: none; padding: 0; width: 100%; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="converter-dashboard">
+        <h2>CV Hochpräzisions-PDF-Konverter v6</h2>
+        <p>Unterstützt jetzt Telefonnummern, E-Mail-Adressen und schützt vor XML-Sonderzeichen wie &amp;.</p>
+        
+        <div class="upload-box" onclick="document.getElementById('xmlFile').click()">
+            <span id="upload-status">Klicke hier, um deine <b>.xml Datei</b> auszuwählen</span>
+            <input type="file" id="xmlFile" accept=".xml" style="display:none" onchange="processXML(event)">
+        </div>
+
+        <button id="pdfBtn" class="btn-action" onclick="generateHighQualityPDF()">Kompaktes PDF generieren</button>
+    </div>
+
+    <div class="preview-wrapper">
+        <div id="resume-render-target"></div>
+    </div>
+
+    <script>
+        let currentXmlDoc = null;
+        let filenameSuggestion = "lebenslauf.pdf";
+
+        function processXML(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            filenameSuggestion = file.name.replace('.xml', '.pdf');
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(e.target.result, "text/xml");
+                currentXmlDoc = xmlDoc;
+                
+                renderResumeData(xmlDoc);
+                
+                document.getElementById('upload-status').innerHTML = `Datei erfolgreich geladen: <b>${file.name}</b>`;
+                document.getElementById('resume-render-target').style.display = 'block';
+                document.getElementById('pdfBtn').style.display = 'inline-block';
+            };
+            
+            reader.readAsText(file);
+        }
+
+        function renderResumeData(xml) {
+            const target = document.getElementById('resume-render-target');
+            
+            // 1. Stammdaten extrahieren (Inklusive Telefon & E-Mail)
+            const vorname = xml.getElementsByTagName("vorname")[0]?.textContent || "";
+            const nachname = xml.getElementsByTagName("nachname")[0]?.textContent || "";
+            const strasse = xml.getElementsByTagName("strasse")[0]?.textContent || "";
+            const plz = xml.getElementsByTagName("plz")[0]?.textContent || "";
+            const ort = xml.getElementsByTagName("ort")[0]?.textContent || "";
+            const telefon = xml.getElementsByTagName("telefon")[0]?.textContent || "";
+            const email = xml.getElementsByTagName("email")[0]?.textContent || "";
+            const geburtsdatum = xml.getElementsByTagName("geburtsdatum")[0]?.textContent || "";
+            const imageBase64 = xml.getElementsByTagName("image")[0]?.textContent || "";
+
+            // Formatierung der Kontaktdaten-Zeilen
+            let contactDetails = [];
+            if (strasse) contactDetails.push(strasse);
+            if (plz || ort) contactDetails.push(`${plz} ${ort}`.trim());
+            if (geburtsdatum) contactDetails.push(`Geburtsdatum: ${geburtsdatum}`);
+            
+            let communications = [];
+            if (telefon) communications.push(`Tel: ${telefon}`);
+            if (email) communications.push(`E-Mail: ${email}`);
+
+            let infoHtml = `<div class="resume-info">${contactDetails.join(' | ')}`;
+            if (communications.length > 0) {
+                infoHtml += `<br>${communications.join(' | ')}`;
+            }
+            infoHtml += `</div>`;
+
+            let imgHtml = '';
+            if (imageBase64 && imageBase64.trim().length > 100) {
+                imgHtml = `<div class="header-cell-img"><img class="resume-profile-img" src="${imageBase64.trim()}" alt="Profilbild"></div>`;
+            }
+
+            let html = `
+                <div class="resume-header">
+                    ${imgHtml}
+                    <div class="header-cell-text">
+                        <div class="resume-title">
+                            <h1>${vorname} ${nachname}</h1>
+                            ${infoHtml}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // 2. Sektion: Berufserfahrung
+            const exps = xml.getElementsByTagName("experience");
+            let expHtml = '';
+            for (let i = 0; i < exps.length; i++) {
+                const company = exps[i].getElementsByTagName("company")[0]?.textContent || "";
+                const role = exps[i].getElementsByTagName("role")[0]?.textContent || "";
+                const date = exps[i].getElementsByTagName("date")[0]?.textContent || " ";
+                const location = exps[i].getElementsByTagName("location")[0]?.textContent || "";
+                
+                let projsHtml = '';
+                const projs = exps[i].getElementsByTagName("project");
+                for (let j = 0; j < projs.length; j++) {
+                    const pTitle = projs[j].getElementsByTagName("title")[0]?.textContent || "";
+                    const pDate = projs[j].getElementsByTagName("date")[0]?.textContent || "";
+                    const pDesc = projs[j].getElementsByTagName("desc")[0]?.textContent || "";
+                    if (pTitle) {
+                        projsHtml += `
+                            <li>
+                                <span class="preview-project-title">${pTitle}</span>
+                                ${pDate ? `<span class="preview-project-date">(${pDate})</span>` : ''}
+                                ${pDesc ? `<p class="preview-project-desc">${pDesc}</p>` : ''}
+                            </li>`;
+                    }
+                }
+
+                expHtml += `
+                    <div class="resume-item">
+                        <div class="resume-item-date">${date}</div>
+                        <div class="resume-item-content">
+                            <div class="resume-item-title">${role} ${company ? `bei ${company}` : ''}</div>
+                            <div class="resume-item-sub">${location}</div>
+                            ${projsHtml ? `<ul class="project-list">${projsHtml}</ul>` : ''}
+                        </div>
+                    </div>`;
+            }
+            if (expHtml) { html += `<div class="resume-section"><h2>Berufserfahrung</h2>${expHtml}</div>`; }
+
+            // 3. Sektion: Ausbildung
+            const edus = xml.getElementsByTagName("education");
+            let eduHtml = '';
+            for (let i = 0; i < edus.length; i++) {
+                const school = edus[i].getElementsByTagName("school")[0]?.textContent || "";
+                const degree = edus[i].getElementsByTagName("degree")[0]?.textContent || "";
+                const date = edus[i].getElementsByTagName("date")[0]?.textContent || " ";
+                const location = edus[i].getElementsByTagName("location")[0]?.textContent || "";
+                const grade = edus[i].getElementsByTagName("grade")[0]?.textContent || "";
+
+                let projsHtml = '';
+                const projs = edus[i].getElementsByTagName("project");
+                for (let j = 0; j < projs.length; j++) {
+                    const pTitle = projs[j].getElementsByTagName("title")[0]?.textContent || "";
+                    const pDate = projs[j].getElementsByTagName("date")[0]?.textContent || "";
+                    const pDesc = projs[j].getElementsByTagName("desc")[0]?.textContent || "";
+                    if (pTitle) {
+                        projsHtml += `
+                            <li>
+                                <span class="preview-project-title">${pTitle}</span>
+                                ${pDate ? `<span class="preview-project-date">(${pDate})</span>` : ''}
+                                ${pDesc ? `<p class="preview-project-desc">${pDesc}</p>` : ''}
+                            </li>`;
+                    }
+                }
+
+                eduHtml += `
+                    <div class="resume-item">
+                        <div class="resume-item-date">${date}</div>
+                        <div class="resume-item-content">
+                            <div class="resume-item-title">${degree} ${school ? `- ${school}` : ''}</div>
+                            <div class="resume-item-sub">${location} ${grade ? ` (${grade})` : ''}</div>
+                            ${projsHtml ? `<ul class="project-list">${projsHtml}</ul>` : ''}
+                        </div>
+                    </div>`;
+            }
+            if (eduHtml) { html += `<div class="resume-section"><h2>Ausbildung</h2>${eduHtml}</div>`; }
+
+            // 4. Sektion: Eigene Projekte
+            const pps = xml.getElementsByTagName("personalProject");
+            let ppHtml = '';
+            for (let i = 0; i < pps.length; i++) {
+                const title = pps[i].getElementsByTagName("title")[0]?.textContent || "";
+                const subtitle = pps[i].getElementsByTagName("subtitle")[0]?.textContent || "";
+                const date = pps[i].getElementsByTagName("date")[0]?.textContent || " ";
+                const link = pps[i].getElementsByTagName("link")[0]?.textContent || "";
+                const desc = pps[i].getElementsByTagName("desc")[0]?.textContent || "";
+
+                ppHtml += `
+                    <div class="resume-item">
+                        <div class="resume-item-date">${date}</div>
+                        <div class="resume-item-content">
+                            <div class="resume-item-title">${title} ${link ? `<span style="font-weight:normal; font-size:9pt; color:var(--secondary-color);">(${link})</span>` : ''}</div>
+                            <div class="resume-item-sub">${subtitle}</div>
+                            ${desc ? `<p class="personal-project-desc">${desc}</p>` : ''}
+                        </div>
+                    </div>`;
+            }
+            if (ppHtml) { html += `<div class="resume-section"><h2>Eigene Projekte</h2>${ppHtml}</div>`; }
+
+            // 5. Sektion: Skills
+            const languages = xml.getElementsByTagName("languages")[0]?.textContent || "";
+            const it = xml.getElementsByTagName("it")[0]?.textContent || "";
+            const tools = xml.getElementsByTagName("tools")[0]?.textContent || "";
+
+            let skillsHtml = '';
+            if (languages) { skillsHtml += `<div class="skill-category"><div class="skill-category-title">Fremdsprachen</div><div class="skills-container">${languages}</div></div>`; }
+            if (it) { skillsHtml += `<div class="skill-category"><div class="skill-category-title">IT-Skills</div><div class="skills-container">${it}</div></div>`; }
+            if (tools) { skillsHtml += `<div class="skill-category"><div class="skill-category-title">Tools & Frameworks</div><div class="skills-container">${tools}</div></div>`; }
+            
+            if (skillsHtml) { html += `<div class="resume-section"><h2>Skills & Kompetenzen</h2>${skillsHtml}</div>`; }
+
+            target.innerHTML = html;
+        }
+
+        function generateHighQualityPDF() {
+            const element = document.getElementById('resume-render-target');
+            const opt = {
+                margin:       [15, 15, 15, 15],
+                filename:     filenameSuggestion,
+                image:        { type: 'jpeg', quality: 1.0 },
+                html2canvas:  { scale: 3, useCORS: true, logging: false, letterRendering: true },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+                pagebreak:    { mode: ['avoid-all', 'css'] }
+            };
+            html2pdf().set(opt).from(element).save();
+        }
+    </script>
+</body>
+</html>

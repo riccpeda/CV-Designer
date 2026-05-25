@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lebenslauf Generator</title>
+    <!-- html2pdf.js Bibliothek für den direkten Vorab-Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --background-color: #ecf0f1;
+            --text-color: #333;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            z-index: 10;
+        }
+
+        .main-container {
+            display: flex;
+            flex: 1;
+            height: calc(100vh - 70px);
+            overflow: hidden;
+        }
+
+        /* Formular-Bereich (Links) */
+        .editor-side {
+            width: 45%;
+            padding: 20px;
+            overflow-y: auto;
+            background: white;
+            border-right: 2px solid #bdc3c7;
+        }
+
+        /* Vorschau-Bereich (Rechts) */
+        .preview-side {
+            width: 55%;
+            padding: 20px;
+            overflow-y: auto;
+            background: #7f8c8d;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+        }
+
+        /* A4 Vorschau */
+        .resume-preview {
+            width: 210mm;
+            min-height: 297mm;
+            background: white;
+            padding: 20mm 15mm;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            box-sizing: border-box;
+            position: relative;
+        }
+
+        /* Formular-Styling Inputs */
+        .form-group { margin-bottom: 15px; }
+        .form-row { display: flex; gap: 10px; margin-bottom: 15px; }
+        .form-row .form-group { flex: 1; margin-bottom: 0; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 0.9rem; }
+        input, textarea { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        
+        .dynamic-section {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 6px;
+            background: #f9f9f9;
+            position: relative;
+        }
+        .project-item {
+            border-left: 3px solid var(--secondary-color);
+            padding-left: 10px;
+            margin-bottom: 15px;
+            background: #fff;
+            padding: 10px;
+            border-radius: 4px;
+            position: relative;
+        }
+        
+        .control-buttons { position: absolute; top: 10px; right: 10px; display: flex; gap: 5px; }
+        button { background-color: var(--secondary-color); color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
+        button.btn-nav { background-color: #95a5a6; }
+        button.btn-danger { background-color: #e74c3c; }
+        button:hover { opacity: 0.9; }
+        hr { border: 0; height: 1px; background: #ddd; margin: 20px 0; }
+
+        /* --- LEBENSLAUF VORSCHAU DESIGN --- */
+        .resume-header {
+            display: flex;
+            align-items: center;
+            border-bottom: 3px solid var(--primary-color);
+            padding-bottom: 20px;
+            margin-bottom: 25px;
+        }
+        .resume-profile-img {
+            width: 120px;
+            height: 150px;
+            object-fit: cover;
+            border: 2px solid var(--primary-color);
+            margin-right: 20px;
+            display: none;
+        }
+        .resume-title h1 { margin: 0; color: var(--primary-color); font-size: 2.2rem; }
+        .resume-info { font-size: 0.95rem; color: #555; margin-top: 8px; line-height: 1.4; }
+        
+        .resume-section {
+            margin-bottom: 25px;
+            page-break-inside: auto;
+        }
+        .resume-section h2 {
+            color: var(--primary-color);
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 3px;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            font-size: 1.15rem;
+            letter-spacing: 1px;
+            page-break-after: avoid;
+        }
+
+        /* Tabellarische Ausrichtung */
+        .resume-item {
+            display: table;
+            width: 100%;
+            margin-bottom: 15px;
+            page-break-inside: avoid;
+        }
+        .resume-item-date {
+            display: table-cell;
+            width: 35mm;
+            font-weight: bold;
+            color: var(--primary-color);
+            font-size: 0.95rem;
+            vertical-align: top;
+            padding-right: 5mm;
+        }
+        .resume-item-content {
+            display: table-cell;
+            vertical-align: top;
+        }
+        .resume-item-title {
+            font-weight: bold;
+            color: #2c3e50;
+            font-size: 1.05rem;
+            margin-bottom: 2px;
+        }
+        .resume-item-sub {
+            font-style: italic;
+            color: #7f8c8d;
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+        }
+        
+        .preview-project-title { font-weight: bold; color: #333; }
+        .preview-project-date { font-style: italic; color: #666; font-size: 0.85rem; }
+        .preview-project-desc { margin: 2px 0 8px 0; font-size: 0.9rem; color: #555; }
+        
+        .skill-category { margin-bottom: 12px; page-break-inside: avoid; }
+        .skill-category-title { font-weight: bold; font-size: 0.95rem; color: var(--primary-color); margin-bottom: 4px; }
+        .skills-container { display: flex; flex-wrap: wrap; gap: 8px; }
+        .skill-tag { background: #f0f3f4; border: 1px solid #d5dbdb; padding: 4px 10px; border-radius: 4px; font-size: 0.85rem; }
+
+        @media print {
+            html, body { height: auto; overflow: visible; background: white; }
+            .main-container { height: auto; overflow: visible; }
+            .editor-side, header { display: none; }
+            .preview-side { width: 100%; padding: 0; background: white; }
+            .resume-preview { box-shadow: none; padding: 0; width: 100%; min-height: auto; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h2>CV-Designer</h2>
+        <div>
+            <a href="https://vianovia.com/Lebenslauf/xml-pdf.html" target="_blank"><button>XML in PDF</button></a>
+            <button onclick="exportPDF()">Direkt-PDF</button>
+            <button onclick="exportXML()">XML Exportieren</button>
+            <button onclick="document.getElementById('xmlInput').click()">XML Importieren</button>
+            <input type="file" id="xmlInput" accept=".xml" style="display:none" onchange="importXML(event)">
+        </div>
+    </header>
+
+    <div class="main-container">
+        <!-- FORMULAR-INPUTS (LINKS) -->
+        <div class="editor-side" id="formContainer">
+            <h3>Stammdaten</h3>
+            <div class="form-group">
+                <label>Profilbild</label>
+                <input type="file" id="form-img" accept="image/*" onchange="updateImage(this)">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Vorname</label>
+                    <input type="text" id="form-vorname" oninput="updateLivePreview()">
+                </div>
+                <div class="form-group">
+                    <label>Nachname</label>
+                    <input type="text" id="form-nachname" oninput="updateLivePreview()">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Straße &amp; Hausnummer</label>
+                <input type="text" id="form-strasse" placeholder="Musterstraße 12a" oninput="updateLivePreview()">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>PLZ</label>
+                    <input type="text" id="form-plz" placeholder="12345" oninput="updateLivePreview()">
+                </div>
+                <div class="form-group">
+                    <label>Ort</label>
+                    <input type="text" id="form-ort" placeholder="Musterstadt" oninput="updateLivePreview()">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Telefonnummer</label>
+                    <input type="tel" id="form-telefon" placeholder="+49 123 456789" oninput="updateLivePreview()">
+                </div>
+                <div class="form-group">
+                    <label>E-Mail-Adresse</label>
+                    <input type="email" id="form-email" placeholder="riccardo@example.com" oninput="updateLivePreview()">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Geburtsdatum</label>
+                <input type="text" id="form-geburtsdatum" placeholder="z.B. 15.08.1998" oninput="updateLivePreview()">
+            </div>
+
+            <hr>
+
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3>Berufserfahrung</h3>
+                <button type="button" onclick="addExperience()">+ Hinzufügen</button>
+            </div>
+            <div id="experience-container"></div>
+
+            <hr>
+
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3>Ausbildung</h3>
+                <button type="button" onclick="addEducation()">+ Hinzufügen</button>
+            </div>
+            <div id="education-container"></div>
+
+            <hr>
+
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3>Eigene / Private Projekte</h3>
+                <button type="button" onclick="addPersonalProject()">+ Hinzufügen</button>
+            </div>
+            <div id="personal-projects-container"></div>
+
+            <hr>
+
+            <h3>Fertigkeiten &amp; Skills</h3>
+            <div class="form-group">
+                <label>Fremdsprachen (Kommagetrennt)</label>
+                <input type="text" id="form-skills-languages" placeholder="Deutsch (Muttersprache), Englisch (C1)" oninput="updateLivePreview()">
+            </div>
+            <div class="form-group">
+                <label>IT-Skills (Kommagetrennt)</label>
+                <input type="text" id="form-skills-it" placeholder="Python, JavaScript, SQL" oninput="updateLivePreview()">
+            </div>
+            <div class="form-group">
+                <label>Tools &amp; Frameworks (Kommagetrennt)</label>
+                <input type="text" id="form-skills-tools" placeholder="Git, Docker, Excel" oninput="updateLivePreview()">
+            </div>
+        </div>
+
+        <!-- LIVE VORSCHAU (RECHTS) -->
+        <div class="preview-side">
+            <div class="resume-preview" id="resume-print-area">
+                <div class="resume-header">
+                    <img id="view-img" class="resume-profile-img" src="" alt="Profilbild">
+                    <div class="resume-title">
+                        <h1 id="view-name">Vorname Nachname</h1>
+                        <div id="view-meta-container">
+                            <div class="resume-info" id="view-meta-address">Straße 12, 12345 Ort | Geburtsdatum</div>
+                            <div class="resume-info" id="view-meta-contact" style="margin-top: 2px;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="resume-section">
+                    <h2>Berufserfahrung</h2>
+                    <div id="view-experience"></div>
+                </div>
+
+                <div class="resume-section">
+                    <h2>Ausbildung</h2>
+                    <div id="view-education"></div>
+                </div>
+
+                <div class="resume-section" id="view-personal-projects-section" style="display:none;">
+                    <h2>Eigene Projekte</h2>
+                    <div id="view-personal-projects"></div>
+                </div>
+
+                <div class="resume-section">
+                    <h2>Skills &amp; Kompetenzen</h2>
+                    <div id="view-skills-section"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let imgBase64 = "";
+        const generateId = () => 'id_' + Math.random().toString(36).substr(2, 9);
+
+        // Maskierungsfunktion gegen XML-Parsing-Fehler (z.B. & -> &amp;)
+        function escapeXML(str) {
+            if (!str) return "";
+            return str.replace(/&/g, "&amp;")
+                      .replace(/</g, "&lt;")
+                      .replace(/>/g, "&gt;")
+                      .replace(/"/g, "&quot;")
+                      .replace(/'/g, "&apos;");
+        }
+
+        function updateImage(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    imgBase64 = e.target.result;
+                    const viewImg = document.getElementById('view-img');
+                    viewImg.src = imgBase64;
+                    viewImg.style.display = 'block';
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        function moveSection(button, direction) {
+            const section = button.closest('.dynamic-section');
+            const parent = section.parentNode;
+            if (direction === 'up' && section.previousElementSibling) {
+                parent.insertBefore(section, section.previousElementSibling);
+            } else if (direction === 'down' && section.nextElementSibling) {
+                parent.insertBefore(section.nextElementSibling, section);
+            }
+            updateLivePreview();
+        }
+
+        function moveProject(button, direction) {
+            const project = button.closest('.project-item');
+            const parent = project.parentNode;
+            if (direction === 'up' && project.previousElementSibling && project.previousElementSibling.classList.contains('project-item')) {
+                parent.insertBefore(project, project.previousElementSibling);
+            } else if (direction === 'down' && project.nextElementSibling) {
+                parent.insertBefore(project.nextElementSibling, project);
+            }
+            updateLivePreview();
+        }
+
+        function addExperience() {
+            const container = document.getElementById('experience-container');
+            const id = generateId();
+            const html = `
+                <div class="dynamic-section" data-type="experience" id="${id}">
+                    <div class="control-buttons">
+                        <button class="btn-nav" onclick="moveSection(this, 'up')">▲</button>
+                        <button class="btn-nav" onclick="moveSection(this, 'down')">▼</button>
+                        <button class="btn-danger" onclick="document.getElementById('${id}').remove(); updateLivePreview();">X</button>
+                    </div>
+                    <div class="form-group"><label>Arbeitgeber / Firma</label><input type="text" class="exp-company" oninput="updateLivePreview()"></div>
+                    <div class="form-group"><label>Position</label><input type="text" class="exp-role" oninput="updateLivePreview()"></div>
+                    <div class="form-row">
+                        <div class="form-group"><label>Zeitraum / Datum</label><input type="text" class="exp-date" placeholder="z.B. 2022 - Heute" oninput="updateLivePreview()"></div>
+                        <div class="form-group"><label>Ort</label><input type="text" class="exp-location" placeholder="z.B. Berlin" oninput="updateLivePreview()"></div>
+                    </div>
+                    <div class="projects-container" style="margin-top:10px;"><h6>Projekte</h6></div>
+                    <button type="button" onclick="addProject('${id}')">+ Projekt hinzufügen</button>
+                </div>`;
+            container.insertAdjacentHTML('afterbegin', html);
+            updateLivePreview();
+        }
+
+        function addEducation() {
+            const container = document.getElementById('education-container');
+            const id = generateId();
+            const html = `
+                <div class="dynamic-section" data-type="education" id="${id}">
+                    <div class="control-buttons">
+                        <button class="btn-nav" onclick="moveSection(this, 'up')">▲</button>
+                        <button class="btn-nav" onclick="moveSection(this, 'down')">▼</button>
+                        <button class="btn-danger" onclick="document.getElementById('${id}').remove(); updateLivePreview();">X</button>
+                    </div>
+                    <div class="form-group"><label>Institution / Schule / Universität</label><input type="text" class="edu-school" oninput="updateLivePreview()"></div>
+                    <div class="form-group"><label>Abschluss / Studienrichtung</label><input type="text" class="edu-degree" oninput="updateLivePreview()"></div>
+                    <div class="form-row">
+                        <div class="form-group"><label>Zeitraum / Datum</label><input type="text" class="edu-date" placeholder="z.B. 2018 - 2021" oninput="updateLivePreview()"></div>
+                        <div class="form-group"><label>Ort</label><input type="text" class="edu-location" placeholder="z.B. Hamburg" oninput="updateLivePreview()"></div>
+                    </div>
+                    <div class="form-group"><label>Note / ECTS (Optional)</label><input type="text" class="edu-grade" placeholder="z.B. Note: 1.3" oninput="updateLivePreview()"></div>
+                    <div class="projects-container" style="margin-top:10px;"><h6>Projekte/Schwerpunkte</h6></div>
+                    <button type="button" onclick="addProject('${id}')">+ Projekt hinzufügen</button>
+                </div>`;
+            container.insertAdjacentHTML('afterbegin', html);
+            updateLivePreview();
+        }
+
+        function addPersonalProject() {
+            const container = document.getElementById('personal-projects-container');
+            const id = generateId();
+            const html = `
+                <div class="dynamic-section" data-type="personal-project" id="${id}">
+                    <div class="control-buttons">
+                        <button class="btn-nav" onclick="moveSection(this, 'up')">▲</button>
+                        <button class="btn-nav" onclick="moveSection(this, 'down')">▼</button>
+                        <button class="btn-danger" onclick="document.getElementById('${id}').remove(); updateLivePreview();">X</button>
+                    </div>
+                    <div class="form-group"><label>Projektname</label><input type="text" class="pp-title" placeholder="z.B. Smart Home App" oninput="updateLivePreview()"></div>
+                    <div class="form-group"><label>Technologien / Zweck</label><input type="text" class="pp-subtitle" placeholder="z.B. Flutter, Firebase, IoT" oninput="updateLivePreview()"></div>
+                    <div class="form-row">
+                        <div class="form-group"><label>Zeitraum / Datum</label><input type="text" class="pp-date" placeholder="z.B. 2023" oninput="updateLivePreview()"></div>
+                        <div class="form-group"><label>Link / GitHub (Optional)</label><input type="text" class="pp-link" placeholder="z.B. github.com/username/project" oninput="updateLivePreview()"></div>
+                    </div>
+                    <div class="form-group"><label>Beschreibung</label><textarea class="pp-desc" rows="3" placeholder="Kurze Beschreibung deines Projekts..." oninput="updateLivePreview()"></textarea></div>
+                </div>`;
+            container.insertAdjacentHTML('afterbegin', html);
+            updateLivePreview();
+        }
+
+        function addProject(parentId) {
+            const parent = document.getElementById(parentId);
+            const projectContainer = parent.querySelector('.projects-container');
+            const pId = generateId();
+            const html = `
+                <div class="project-item" id="${pId}">
+                    <div class="control-buttons">
+                        <button class="btn-nav" style="padding:2px 6px;" onclick="moveProject(this, 'up')">▲</button>
+                        <button class="btn-nav" style="padding:2px 6px;" onclick="moveProject(this, 'down')">▼</button>
+                        <button class="btn-danger" style="padding:2px 6px;" onclick="document.getElementById('${pId}').remove(); updateLivePreview();">X</button>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group" style="flex:2;"><label>Projektname</label><input type="text" class="project-title" oninput="updateLivePreview()"></div>
+                        <div class="form-group" style="flex:1;"><label>Zeitraum (opt.)</label><input type="text" class="project-date" placeholder="Q1 2024" oninput="updateLivePreview()"></div>
+                    </div>
+                    <div class="form-group" style="margin-top:5px;"><label>Beschreibung (opt.)</label><textarea class="project-desc" rows="2" oninput="updateLivePreview()"></textarea></div>
+                </div>`;
+            projectContainer.insertAdjacentHTML('beforeend', html);
+            updateLivePreview();
+        }
+
+        function updateLivePreview() {
+            // 1. Stammdaten & Neue Kontaktdaten
+            const vn = document.getElementById('form-vorname').value;
+            const nn = document.getElementById('form-nachname').value;
+            document.getElementById('view-name').innerText = `${vn} ${nn}`.trim() || "Vorname Nachname";
+
+            const str = document.getElementById('form-strasse').value;
+            const plz = document.getElementById('form-plz').value;
+            const ort = document.getElementById('form-ort').value;
+            const geb = document.getElementById('form-geburtsdatum').value;
+            const tel = document.getElementById('form-telefon').value;
+            const mail = document.getElementById('form-email').value;
+
+            let addressPart = "";
+            if (str) addressPart += str;
+            if (plz || ort) {
+                if (addressPart) addressPart += ", ";
+                addressPart += `${plz} ${ort}`.trim();
+            }
+            document.getElementById('view-meta-address').innerText = addressPart 
+                ? `${addressPart} ${geb ? `| Geburtsdatum: ${geb}` : ''}`
+                : (geb ? `Geburtsdatum: ${geb}` : "Deine Stammdaten");
+
+            let contactPart = [];
+            if (tel) contactPart.push(`Tel: ${tel}`);
+            if (mail) contactPart.push(`E-Mail: ${mail}`);
+            document.getElementById('view-meta-contact').innerText = contactPart.join(' | ');
+
+            // 2. Berufserfahrung
+            const expViews = [];
+            document.querySelectorAll('[data-type="experience"]').forEach(el => {
+                const company = el.querySelector('.exp-company').value;
+                const role = el.querySelector('.exp-role').value;
+                const date = el.querySelector('.exp-date').value || " ";
+                const location = el.querySelector('.exp-location').value;
+                
+                let projectsHtml = '';
+                el.querySelectorAll('.project-item').forEach(p => {
+                    const pTitle = p.querySelector('.project-title').value;
+                    const pDate = p.querySelector('.project-date').value;
+                    const pDesc = p.querySelector('.project-desc').value;
+                    if(pTitle) {
+                        projectsHtml += `
+                            <li>
+                                <span class="preview-project-title">${pTitle}</span>
+                                ${pDate ? `<span class="preview-project-date">(${pDate})</span>` : ''}
+                                ${pDesc ? `<p class="preview-project-desc">${pDesc}</p>` : ''}
+                            </li>`;
+                    }
+                });
+
+                if(company || role) {
+                    expViews.push(`
+                        <div class="resume-item">
+                            <div class="resume-item-date">${date}</div>
+                            <div class="resume-item-content">
+                                <div class="resume-item-title">${role} ${company ? `bei ${company}` : ''}</div>
+                                <div class="resume-item-sub">${location}</div>
+                                ${projectsHtml ? `<ul style="margin-top:5px; padding-left:15px; margin-bottom:0;">${projectsHtml}</ul>` : ''}
+                            </div>
+                        </div>`);
+                }
+            });
+            document.getElementById('view-experience').innerHTML = expViews.join('') || "Keine Angaben";
+
+            // 3. Ausbildung
+            const eduViews = [];
+            document.querySelectorAll('[data-type="education"]').forEach(el => {
+                const school = el.querySelector('.edu-school').value;
+                const degree = el.querySelector('.edu-degree').value;
+                const date = el.querySelector('.edu-date').value || " ";
+                const location = el.querySelector('.edu-location').value;
+                const grade = el.querySelector('.edu-grade').value;
+
+                let projectsHtml = '';
+                el.querySelectorAll('.project-item').forEach(p => {
+                    const pTitle = p.querySelector('.project-title').value;
+                    const pDate = p.querySelector('.project-date').value;
+                    const pDesc = p.querySelector('.project-desc').value;
+                    if(pTitle) {
+                        projectsHtml += `
+                            <li>
+                                <span class="preview-project-title">${pTitle}</span>
+                                ${pDate ? `<span class="preview-project-date">(${pDate})</span>` : ''}
+                                ${pDesc ? `<p class="preview-project-desc">${pDesc}</p>` : ''}
+                            </li>`;
+                    }
+                });
+
+                if(school || degree) {
+                    eduViews.push(`
+                        <div class="resume-item">
+                            <div class="resume-item-date">${date}</div>
+                            <div class="resume-item-content">
+                                <div class="resume-item-title">${degree} ${school ? `- ${school}` : ''}</div>
+                                <div class="resume-item-sub">${location} ${grade ? ` (${grade})` : ''}</div>
+                                ${projectsHtml ? `<ul style="margin-top:5px; padding-left:15px; margin-bottom:0;">${projectsHtml}</ul>` : ''}
+                            </div>
+                        </div>`);
+                }
+            });
+            document.getElementById('view-education').innerHTML = eduViews.join('') || "Keine Angaben";
+
+            // 4. Eigene Projekte Sektion
+            const ppViews = [];
+            document.querySelectorAll('[data-type="personal-project"]').forEach(el => {
+                const title = el.querySelector('.pp-title').value;
+                const subtitle = el.querySelector('.pp-subtitle').value;
+                const date = el.querySelector('.pp-date').value || " ";
+                const link = el.querySelector('.pp-link').value;
+                const desc = el.querySelector('.pp-desc').value;
+
+                if (title) {
+                    ppViews.push(`
+                        <div class="resume-item">
+                            <div class="resume-item-date">${date}</div>
+                            <div class="resume-item-content">
+                                <div class="resume-item-title">${title} ${link ? `<span style="font-weight:normal; font-size:0.85rem; color:var(--secondary-color);"> (${link})</span>` : ''}</div>
+                                <div class="resume-item-sub">${subtitle}</div>
+                                ${desc ? `<p style="margin: 4px 0 0 0; font-size: 0.9rem; color: #555; white-space: pre-line;">${desc}</p>` : ''}
+                            </div>
+                        </div>`);
+                }
+            });
+
+            const ppSection = document.getElementById('view-personal-projects-section');
+            if (ppViews.length > 0) {
+                ppSection.style.display = 'block';
+                document.getElementById('view-personal-projects').innerHTML = ppViews.join('');
+            } else {
+                ppSection.style.display = 'none';
+                document.getElementById('view-personal-projects').innerHTML = '';
+            }
+
+            // 5. Skills
+            renderSkillCategory('Fremdsprachen', 'form-skills-languages');
+            renderSkillCategory('IT-Skills', 'form-skills-it');
+            renderSkillCategory('Tools &amp; Frameworks', 'form-skills-tools');
+        }
+
+        function renderSkillCategory(label, inputId) {
+            const val = document.getElementById(inputId).value;
+            const container = document.getElementById('view-skills-section');
+            if(inputId === 'form-skills-languages') container.innerHTML = ''; 
+            
+            if(!val.trim()) return;
+            const tags = val.split(',').map(s => s.trim()).filter(s => s.length > 0);
+            if(tags.length === 0) return;
+
+            let html = `<div class="skill-category"><div class="skill-category-title">${label}</div><div class="skills-container">`;
+            tags.forEach(t => { html += `<span class="skill-tag">${t}</span>`; });
+            html += `</div></div>`;
+            container.insertAdjacentHTML('beforeend', html);
+        }
+
+        function exportPDF() {
+            const element = document.getElementById('resume-print-area');
+            const opt = {
+                margin:       15,
+                filename:     'lebenslauf_v6.pdf',
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+                pagebreak:    { mode: ['avoid-all', 'css'] }
+            };
+            html2pdf().set(opt).from(element).save();
+        }
+
+        // XML EXPORT (Jetzt sicher geschützt durch escapeXML)
+        function exportXML() {
+            let xmlString = `<?xml version="1.0" encoding="UTF-8"?>\n<resume>\n`;
+            xmlString += `  <personal>\n`;
+            xmlString += `    <vorname>${escapeXML(document.getElementById('form-vorname').value)}</vorname>\n`;
+            xmlString += `    <nachname>${escapeXML(document.getElementById('form-nachname').value)}</nachname>\n`;
+            xmlString += `    <strasse>${escapeXML(document.getElementById('form-strasse').value)}</strasse>\n`;
+            xmlString += `    <plz>${escapeXML(document.getElementById('form-plz').value)}</plz>\n`;
+            xmlString += `    <ort>${escapeXML(document.getElementById('form-ort').value)}</ort>\n`;
+            xmlString += `    <telefon>${escapeXML(document.getElementById('form-telefon').value)}</telefon>\n`;
+            xmlString += `    <email>${escapeXML(document.getElementById('form-email').value)}</email>\n`;
+            xmlString += `    <geburtsdatum>${escapeXML(document.getElementById('form-geburtsdatum').value)}</geburtsdatum>\n`;
+            xmlString += `    <image>${imgBase64}</image>\n`;
+            xmlString += `  </personal>\n`;
+
+            xmlString += `  <experiences>\n`;
+            document.querySelectorAll('[data-type="experience"]').forEach(el => {
+                xmlString += `    <experience>\n`;
+                xmlString += `      <company>${escapeXML(el.querySelector('.exp-company').value)}</company>\n`;
+                xmlString += `      <role>${escapeXML(el.querySelector('.exp-role').value)}</role>\n`;
+                xmlString += `      <date>${escapeXML(el.querySelector('.exp-date').value)}</date>\n`;
+                xmlString += `      <location>${escapeXML(el.querySelector('.exp-location').value)}</location>\n`;
+                xmlString += `      <projects>\n`;
+                el.querySelectorAll('.project-item').forEach(p => {
+                    xmlString += `        <project>\n`;
+                    xmlString += `          <title>${escapeXML(p.querySelector('.project-title').value)}</title>\n`;
+                    xmlString += `          <date>${escapeXML(p.querySelector('.project-date').value)}</date>\n`;
+                    xmlString += `          <desc>${escapeXML(p.querySelector('.project-desc').value)}</desc>\n`;
+                    xmlString += `        </project>\n`;
+                });
+                xmlString += `      </projects>\n`;
+                xmlString += `    </experience>\n`;
+            });
+            xmlString += `  </experiences>\n`;
+
+            xmlString += `  <educations>\n`;
+            document.querySelectorAll('[data-type="education"]').forEach(el => {
+                xmlString += `    <education>\n`;
+                xmlString += `      <school>${escapeXML(el.querySelector('.edu-school').value)}</school>\n`;
+                xmlString += `      <degree>${escapeXML(el.querySelector('.edu-degree').value)}</degree>\n`;
+                xmlString += `      <date>${escapeXML(el.querySelector('.edu-date').value)}</date>\n`;
+                xmlString += `      <location>${escapeXML(el.querySelector('.edu-location').value)}</location>\n`;
+                xmlString += `      <grade>${escapeXML(el.querySelector('.edu-grade').value)}</grade>\n`;
+                xmlString += `      <projects>\n`;
+                el.querySelectorAll('.project-item').forEach(p => {
+                    xmlString += `        <project>\n`;
+                    xmlString += `          <title>${escapeXML(p.querySelector('.project-title').value)}</title>\n`;
+                    xmlString += `          <date>${escapeXML(p.querySelector('.project-date').value)}</date>\n`;
+                    xmlString += `          <desc>${escapeXML(p.querySelector('.project-desc').value)}</desc>\n`;
+                    xmlString += `        </project>\n`;
+                });
+                xmlString += `      </projects>\n`;
+                xmlString += `    </education>\n`;
+            });
+            xmlString += `  </educations>\n`;
+
+            xmlString += `  <personalProjects>\n`;
+            document.querySelectorAll('[data-type="personal-project"]').forEach(el => {
+                xmlString += `    <personalProject>\n`;
+                xmlString += `      <title>${escapeXML(el.querySelector('.pp-title').value)}</title>\n`;
+                xmlString += `      <subtitle>${escapeXML(el.querySelector('.pp-subtitle').value)}</subtitle>\n`;
+                xmlString += `      <date>${escapeXML(el.querySelector('.pp-date').value)}</date>\n`;
+                xmlString += `      <link>${escapeXML(el.querySelector('.pp-link').value)}</link>\n`;
+                xmlString += `      <desc>${escapeXML(el.querySelector('.pp-desc').value)}</desc>\n`;
+                xmlString += `    </personalProject>\n`;
+            });
+            xmlString += `  </personalProjects>\n`;
+
+            xmlString += `  <skills>\n`;
+            xmlString += `    <languages>${escapeXML(document.getElementById('form-skills-languages').value)}</languages>\n`;
+            xmlString += `    <it>${escapeXML(document.getElementById('form-skills-it').value)}</it>\n`;
+            xmlString += `    <tools>${escapeXML(document.getElementById('form-skills-tools').value)}</tools>\n`;
+            xmlString += `  </skills>\n`;
+            xmlString += `</resume>`;
+
+            const blob = new Blob([xmlString], { type: 'text/xml' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'lebenslauf_daten_v6.xml';
+            a.click();
+        }
+
+        // XML IMPORT (Liest die neuen Kontaktfelder fehlerfrei ein)
+        function importXML(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(e.target.result, "text/xml");
+
+                document.getElementById('form-vorname').value = xmlDoc.getElementsByTagName("vorname")[0]?.textContent || "";
+                document.getElementById('form-nachname').value = xmlDoc.getElementsByTagName("nachname")[0]?.textContent || "";
+                document.getElementById('form-strasse').value = xmlDoc.getElementsByTagName("strasse")[0]?.textContent || "";
+                document.getElementById('form-plz').value = xmlDoc.getElementsByTagName("plz")[0]?.textContent || "";
+                document.getElementById('form-ort').value = xmlDoc.getElementsByTagName("ort")[0]?.textContent || "";
+                document.getElementById('form-telefon').value = xmlDoc.getElementsByTagName("telefon")[0]?.textContent || "";
+                document.getElementById('form-email').value = xmlDoc.getElementsByTagName("email")[0]?.textContent || "";
+                document.getElementById('form-geburtsdatum').value = xmlDoc.getElementsByTagName("geburtsdatum")[0]?.textContent || "";
+                
+                imgBase64 = xmlDoc.getElementsByTagName("image")[0]?.textContent || "";
+                const viewImg = document.getElementById('view-img');
+                if(imgBase64) {
+                    viewImg.src = imgBase64;
+                    viewImg.style.display = 'block';
+                } else {
+                    viewImg.style.display = 'none';
+                }
+
+                document.getElementById('experience-container').innerHTML = "";
+                document.getElementById('education-container').innerHTML = "";
+                document.getElementById('personal-projects-container').innerHTML = "";
+
+                const exps = xmlDoc.getElementsByTagName("experience");
+                for(let i = exps.length - 1; i >= 0; i--) {
+                    addExperience();
+                    const lastExp = document.getElementById('experience-container').firstElementChild;
+                    lastExp.querySelector('.exp-company').value = exps[i].getElementsByTagName("company")[0]?.textContent || "";
+                    lastExp.querySelector('.exp-role').value = exps[i].getElementsByTagName("role")[0]?.textContent || "";
+                    lastExp.querySelector('.exp-date').value = exps[i].getElementsByTagName("date")[0]?.textContent || "";
+                    lastExp.querySelector('.exp-location').value = exps[i].getElementsByTagName("location")[0]?.textContent || "";
+                    
+                    const projs = exps[i].getElementsByTagName("project");
+                    for(let j = 0; j < projs.length; j++) {
+                        addProject(lastExp.id);
+                        const pEl = lastExp.querySelectorAll('.project-item')[j];
+                        pEl.querySelector('.project-title').value = projs[j].getElementsByTagName("title")[0]?.textContent || "";
+                        pEl.querySelector('.project-date').value = projs[j].getElementsByTagName("date")[0]?.textContent || "";
+                        pEl.querySelector('.project-desc').value = projs[j].getElementsByTagName("desc")[0]?.textContent || "";
+                    }
+                }
+
+                const edus = xmlDoc.getElementsByTagName("education");
+                for(let i = edus.length - 1; i >= 0; i--) {
+                    addEducation();
+                    const lastEdu = document.getElementById('education-container').firstElementChild;
+                    lastEdu.querySelector('.edu-school').value = edus[i].getElementsByTagName("school")[0]?.textContent || "";
+                    lastEdu.querySelector('.edu-degree').value = edus[i].getElementsByTagName("degree")[0]?.textContent || "";
+                    lastEdu.querySelector('.edu-date').value = edus[i].getElementsByTagName("date")[0]?.textContent || "";
+                    lastEdu.querySelector('.edu-location').value = edus[i].getElementsByTagName("location")[0]?.textContent || "";
+                    lastEdu.querySelector('.edu-grade').value = edus[i].getElementsByTagName("grade")[0]?.textContent || "";
+                    
+                    const projs = edus[i].getElementsByTagName("project");
+                    for(let j = 0; j < projs.length; j++) {
+                        addProject(lastEdu.id);
+                        const pEl = lastEdu.querySelectorAll('.project-item')[j];
+                        pEl.querySelector('.project-title').value = projs[j].getElementsByTagName("title")[0]?.textContent || "";
+                        pEl.querySelector('.project-date').value = projs[j].getElementsByTagName("date")[0]?.textContent || "";
+                        pEl.querySelector('.project-desc').value = projs[j].getElementsByTagName("desc")[0]?.textContent || "";
+                    }
+                }
+
+                const pps = xmlDoc.getElementsByTagName("personalProject");
+                for(let i = pps.length - 1; i >= 0; i--) {
+                    addPersonalProject();
+                    const lastPP = document.getElementById('personal-projects-container').firstElementChild;
+                    lastPP.querySelector('.pp-title').value = pps[i].getElementsByTagName("title")[0]?.textContent || "";
+                    lastPP.querySelector('.pp-subtitle').value = pps[i].getElementsByTagName("subtitle")[0]?.textContent || "";
+                    lastPP.querySelector('.pp-date').value = pps[i].getElementsByTagName("date")[0]?.textContent || "";
+                    lastPP.querySelector('.pp-link').value = pps[i].getElementsByTagName("link")[0]?.textContent || "";
+                    lastPP.querySelector('.pp-desc').value = pps[i].getElementsByTagName("desc")[0]?.textContent || "";
+                }
+
+                document.getElementById('form-skills-languages').value = xmlDoc.getElementsByTagName("languages")[0]?.textContent || "";
+                document.getElementById('form-skills-it').value = xmlDoc.getElementsByTagName("it")[0]?.textContent || "";
+                document.getElementById('form-skills-tools').value = xmlDoc.getElementsByTagName("tools")[0]?.textContent || "";
+
+                updateLivePreview();
+            };
+            reader.readAsText(file);
+        }
+    </script>
+</body>
+</html>
