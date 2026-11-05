@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Lebenslauf-Generator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <style>
 :root {
@@ -285,9 +287,12 @@ html, body {
     box-sizing: border-box; visibility: hidden; pointer-events: none;
 }
 
-.export-stack { position: fixed; left: -10000px; top: 0; }
-.export-stack .a4-page { box-shadow: none; border-radius: 0; animation: none; break-after: page; page-break-after: always; }
-.export-stack .a4-page:last-child { break-after: auto; page-break-after: auto; }
+.pages-stack.exporting { gap: 0; padding: 0; display: block; }
+.pages-stack.exporting .a4-page {
+    box-shadow: none; border-radius: 0; animation: none; margin: 0 auto;
+    break-after: page; page-break-after: always;
+}
+.pages-stack.exporting .a4-page:last-child { break-after: auto; page-break-after: auto; }
 
 @media (max-width: 1024px) {
     .app { flex-direction: column; height: auto; overflow: visible; }
@@ -853,13 +858,15 @@ function fileBaseName() {
 }
 
 async function exportPDF() {
-    const pages = Array.from(document.querySelectorAll('#pagesStack .a4-page'));
+    const stack = document.getElementById('pagesStack');
+    const pages = Array.from(stack.querySelectorAll('.a4-page'));
     if (!pages.length) return;
     const btn = document.getElementById('pdfBtn');
     btn.disabled = true;
     const prevZoom = zoom;
-    setZoom(1);
-    await sleep(80);
+    stack.style.removeProperty('zoom');
+    await sleep(120);
+    let ok = false;
     try {
         if (window.html2canvas && window.jspdf) {
             const pdf = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
@@ -870,26 +877,25 @@ async function exportPDF() {
                 pdf.addImage(img, 'JPEG', 0, 0, 210, 297);
             }
             pdf.save(fileBaseName() + '.pdf');
+            ok = true;
         } else if (window.html2pdf) {
-            const cloneWrap = document.createElement('div');
-            cloneWrap.className = 'export-stack';
-            pages.forEach(p => cloneWrap.appendChild(p.cloneNode(true)));
-            document.body.appendChild(cloneWrap);
+            stack.classList.add('exporting');
+            await sleep(120);
             await html2pdf().set({
                 margin: 0,
                 filename: fileBaseName() + '.pdf',
                 image: { type: 'jpeg', quality: 0.95 },
                 html2canvas: { scale: 2, useCORS: true },
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-                pagebreak: { mode: ['css'] }
-            }).from(cloneWrap).save();
-            cloneWrap.remove();
-        } else {
-            throw new Error('PDF-Bibliothek nicht geladen');
+                pagebreak: { mode: ['css', 'legacy'] }
+            }).from(stack).save();
+            ok = true;
         }
+        if (!ok) throw new Error('PDF-Bibliothek nicht geladen');
     } catch (e) {
         alert('PDF-Export fehlgeschlagen (' + e.message + ').\nBitte nutze den Druckdialog (Drucken-Button), um als PDF zu speichern.');
     } finally {
+        stack.classList.remove('exporting');
         setZoom(prevZoom);
         btn.disabled = false;
     }
