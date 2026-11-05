@@ -671,10 +671,8 @@ function buildResumeHTML() {
             h += '<div class="r-item">' +
                 '<div class="r-date">' + esc(x.date) + '</div>' +
                 '<div class="r-body">' +
-                    '<div class="r-item-title">' + esc(x.title) +
-                        (x.link ? ' <span class="r-sub" style="display:inline;">&nbsp;\u00b7 ' + esc(x.link) + '</span>' : '') +
-                    '</div>' +
-                    '<div class="r-sub">' + esc(x.subtitle) + '</div>' +
+                    '<div class="r-item-title">' + esc(x.title) + '</div>' +
+                    '<div class="r-sub">' + esc([x.subtitle, x.link].filter(Boolean).join(' \u00b7 ')) + '</div>' +
                     (x.desc ? '<div class="r-desc">' + esc(x.desc) + '</div>' : '') +
                 '</div>' +
             '</div>';
@@ -857,6 +855,120 @@ function fileBaseName() {
     return ([p.nachname, p.vorname].filter(Boolean).join('_') || 'Lebenslauf') + '_Lebenslauf';
 }
 
+function parseColorRGBA(str) {
+    const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/.exec(str || '');
+    if (!m) return null;
+    return { r: +m[1], g: +m[2], b: +m[3], a: m[4] === undefined ? 1 : +m[4] };
+}
+
+function overWhite(c) {
+    const a = c.a === undefined ? 1 : c.a;
+    return [Math.round(c.r * a + 255 * (1 - a)), Math.round(c.g * a + 255 * (1 - a)), Math.round(c.b * a + 255 * (1 - a))];
+}
+
+function drawVectorPage(pdf, pageEl) {
+    const mm = 25.4 / 96;
+    const pageRect = pageEl.getBoundingClientRect();
+    const rel = el => {
+        const r = el.getBoundingClientRect();
+        return { x: (r.left - pageRect.left) * mm, y: (r.top - pageRect.top) * mm, w: r.width * mm, h: r.height * mm };
+    };
+
+    const textClasses = ['r-name', 'r-contact', 'r-date', 'r-item-title', 'r-sub', 'r-desc', 'r-proj-desc', 'r-skill-label'];
+
+    function textEl(el, forceUpper) {
+        const cs = getComputedStyle(el);
+        const raw = forceUpper ? el.textContent.toUpperCase() : el.textContent;
+        const text = raw.replace(/\s+/g, ' ').trim();
+        if (!text) return;
+        const b = rel(el);
+        const fsPx = parseFloat(cs.fontSize);
+        const lhPx = parseFloat(cs.lineHeight) || fsPx * 1.45;
+        const col = parseColorRGBA(cs.color) || { r: 17, g: 24, b: 39, a: 1 };
+        pdf.setTextColor(col.r, col.g, col.b);
+        pdf.setFont('helvetica', parseInt(cs.fontWeight, 10) >= 600 ? 'bold' : 'normal');
+        pdf.setFontSize(fsPx * 0.75);
+        const lines = pdf.splitTextToSize(text, Math.max(b.w, 5));
+        const lead = (lhPx - fsPx) / 2 * mm;
+        const ls = parseFloat(cs.letterSpacing) || 0;
+        lines.forEach((ln, i) => {
+            const opts = { baseline: 'top' };
+            if (ls > 0) opts.charSpace = ls * mm;
+            pdf.text(ln, b.x, b.y + lead + i * lhPx * mm, opts);
+        });
+    }
+
+    function drawBorderBottom(el) {
+        const cs = getComputedStyle(el);
+        const wPx = parseFloat(cs.borderBottomWidth);
+        const col = parseColorRGBA(cs.borderBottomColor);
+        if (!wPx || !col || col.a === 0) return;
+        const b = rel(el);
+        const f = overWhite(col);
+        pdf.setDrawColor(f[0], f[1], f[2]);
+        pdf.setLineWidth(wPx * mm);
+        pdf.line(b.x, b.y + b.h - wPx * mm / 2, b.x + b.w, b.y + b.h - wPx * mm / 2);
+    }
+
+    function drawTag(el) {
+        const cs = getComputedStyle(el);
+        const b = rel(el);
+        const bg = parseColorRGBA(cs.backgroundColor);
+        const bd = parseColorRGBA(cs.borderTopColor);
+        if (bg) { const f = overWhite(bg); pdf.setFillColor(f[0], f[1], f[2]); }
+        if (bd) { const s = overWhite(bd); pdf.setDrawColor(s[0], s[1], s[2]); }
+        pdf.setLineWidth(0.15);
+        pdf.roundedRect(b.x, b.y, b.w, b.h, b.h / 2, b.h / 2, bg ? 'FD' : 'D');
+        const col = parseColorRGBA(cs.color) || { r: 37, g: 99, b: 235, a: 1 };
+        pdf.setTextColor(col.r, col.g, col.b);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(parseFloat(cs.fontSize) * 0.75);
+        pdf.text(el.textContent.trim(), b.x + b.w / 2, b.y + b.h / 2, { align: 'center', baseline: 'middle' });
+    }
+
+    function drawPhoto(el) {
+        const img = state.personal.image;
+        if (!img) return;
+        const b = rel(el);
+        const fmt = /^data:image\/png/i.test(img) ? 'PNG' : 'JPEG';
+        pdf.addImage(img, fmt, b.x, b.y, b.w, b.h);
+    }
+
+    function drawLi(el) {
+        const b = rel(el);
+        const title = el.querySelector('.r-proj-title');
+        const date = el.querySelector('.r-proj-date');
+        const desc = el.querySelector('.r-proj-desc');
+        const fsPx = title ? parseFloat(getComputedStyle(title).fontSize) : 9.5 / 0.75;
+        const lhPx = fsPx * 1.45;
+        const lead = (lhPx - fsPx) / 2 * mm;
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(9.5 * 0.75);
+        pdf.setTextColor(55, 65, 81);
+        pdf.text('\u2022', b.x - 2.2, b.y + lead, { baseline: 'top' });
+        if (title) textEl(title, false);
+        if (date) textEl(date, false);
+        if (desc) textEl(desc, false);
+    }
+
+    function walk(el) {
+        const cl = el.classList;
+        if (cl.contains('r-photo')) return drawPhoto(el);
+        if (cl.contains('r-tag')) return drawTag(el);
+        if (el.tagName === 'LI') return drawLi(el);
+        if (textClasses.some(c => cl.contains(c))) return textEl(el, false);
+        if (cl.contains('r-title')) { textEl(el, true); return drawBorderBottom(el); }
+        if (cl.contains('r-header')) { walkChildren(el); return drawBorderBottom(el); }
+        walkChildren(el);
+    }
+
+    function walkChildren(el) {
+        Array.from(el.children).forEach(walk);
+    }
+
+    walkChildren(pageEl);
+}
+
 async function exportPDF() {
     const stack = document.getElementById('pagesStack');
     const pages = Array.from(stack.querySelectorAll('.a4-page'));
@@ -868,7 +980,20 @@ async function exportPDF() {
     await sleep(120);
     let ok = false;
     try {
-        if (window.html2canvas && window.jspdf) {
+        if (window.jspdf) {
+            try {
+                const pdf = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true });
+                for (let i = 0; i < pages.length; i++) {
+                    if (i > 0) pdf.addPage();
+                    drawVectorPage(pdf, pages[i]);
+                }
+                pdf.save(fileBaseName() + '.pdf');
+                ok = true;
+            } catch (e) {
+                ok = false;
+            }
+        }
+        if (!ok && window.html2canvas && window.jspdf) {
             const pdf = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
             for (let i = 0; i < pages.length; i++) {
                 const canvas = await html2canvas(pages[i], { scale: 3, useCORS: true, backgroundColor: '#ffffff', logging: false });
@@ -878,14 +1003,15 @@ async function exportPDF() {
             }
             pdf.save(fileBaseName() + '.pdf');
             ok = true;
-        } else if (window.html2pdf) {
+        }
+        if (!ok && window.html2pdf) {
             stack.classList.add('exporting');
             await sleep(120);
             await html2pdf().set({
                 margin: 0,
                 filename: fileBaseName() + '.pdf',
                 image: { type: 'png' },
-                html2canvas: { scale: 3, useCORS: true },
+                html2canvas: { scale: 2, useCORS: true },
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
                 pagebreak: { mode: ['css', 'legacy'] }
             }).from(stack).save();
