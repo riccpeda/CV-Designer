@@ -1,0 +1,1348 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lebenslauf-Generator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<style>
+:root {
+    --accent: #2563eb;
+    --accent-soft: rgba(37, 99, 235, .12);
+    --accent-line: rgba(37, 99, 235, .4);
+    --ui-accent: #4f46e5;
+    --ui-accent-soft: #eef2ff;
+    --bg: #eef1f6;
+    --panel: #ffffff;
+    --border: #e2e8f0;
+    --text: #0f172a;
+    --muted: #64748b;
+    --radius: 12px;
+    --shadow: 0 1px 2px rgba(15, 23, 42, .06), 0 8px 24px rgba(15, 23, 42, .07);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+    margin: 0;
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+}
+
+.topbar {
+    height: 58px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 18px;
+    gap: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+}
+
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.brand-mark {
+    width: 32px; height: 32px; border-radius: 9px;
+    background: linear-gradient(135deg, var(--ui-accent), #7c3aed);
+    color: #fff; display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 15px; flex-shrink: 0;
+}
+.brand h1 { font-size: 1rem; margin: 0; white-space: nowrap; }
+.brand span { font-size: .72rem; color: var(--muted); display: block; margin-top: 1px; }
+
+.toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    border: 1px solid var(--border); background: #fff; color: var(--text);
+    border-radius: 8px; padding: 7px 12px; font-size: .84rem; font-weight: 600;
+    cursor: pointer; transition: background .15s, border-color .15s, box-shadow .15s, transform .1s;
+    font-family: inherit; text-decoration: none; white-space: nowrap;
+}
+.btn:hover { border-color: #cbd5e1; background: #f8fafc; }
+.btn:active { transform: translateY(1px); }
+.btn.primary { background: var(--ui-accent); border-color: var(--ui-accent); color: #fff; }
+.btn.primary:hover { background: #4338ca; border-color: #4338ca; }
+.btn.icon-only { padding: 7px 9px; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+
+.divider { width: 1px; height: 24px; background: var(--border); margin: 0 2px; }
+
+.zoom-group {
+    display: flex; align-items: center; border: 1px solid var(--border);
+    border-radius: 8px; overflow: hidden; background: #fff;
+}
+.zoom-group button {
+    border: none; background: transparent; width: 30px; height: 32px;
+    cursor: pointer; font-size: 1rem; color: var(--muted); font-family: inherit;
+}
+.zoom-group button:hover { background: #f1f5f9; color: var(--text); }
+.zoom-group .zoom-label { font-size: .78rem; font-weight: 600; min-width: 44px; text-align: center; color: var(--muted); }
+
+.app { display: flex; height: calc(100vh - 58px); overflow: hidden; }
+
+.editor {
+    width: 470px; min-width: 380px; overflow-y: auto; padding: 16px;
+    border-right: 1px solid var(--border); background: #f8fafc;
+}
+
+.panel {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: var(--shadow);
+    padding: 16px; margin-bottom: 16px;
+}
+.panel-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 8px; }
+.panel-head h2 { font-size: .95rem; margin: 0; display: flex; align-items: center; gap: 8px; }
+.panel-head .btn { padding: 5px 10px; font-size: .78rem; }
+.panel-hint { font-size: .75rem; color: var(--muted); margin: -6px 0 0; }
+
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.field { display: flex; flex-direction: column; gap: 4px; font-size: .74rem; color: var(--muted); font-weight: 600; letter-spacing: .02em; }
+.field input, .field textarea {
+    border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;
+    font: inherit; font-size: .88rem; font-weight: 400; color: var(--text);
+    background: #fff; transition: border-color .15s, box-shadow .15s;
+    width: 100%;
+}
+.field textarea { resize: vertical; min-height: 54px; }
+.field input:focus, .field textarea:focus {
+    outline: none; border-color: var(--ui-accent);
+    box-shadow: 0 0 0 3px var(--ui-accent-soft);
+}
+.field input[type="color"] { padding: 3px; height: 36px; cursor: pointer; }
+
+.photo-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.photo-thumb {
+    width: 44px; height: 54px; border-radius: 8px; object-fit: cover;
+    border: 1px solid var(--border); background: #f1f5f9; flex-shrink: 0;
+}
+.photo-placeholder {
+    width: 44px; height: 54px; border-radius: 8px; border: 1px dashed var(--border);
+    background: #f8fafc; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    color: var(--muted);
+}
+
+.check { display: flex; align-items: center; gap: 8px; font-size: .84rem; color: var(--text); cursor: pointer; font-weight: 500; }
+.check input { width: 16px; height: 16px; accent-color: var(--ui-accent); cursor: pointer; }
+
+.entry {
+    border: 1px solid var(--border); border-radius: 10px; margin-bottom: 10px;
+    background: #fff; overflow: hidden; transition: box-shadow .15s;
+}
+.entry:hover { box-shadow: 0 2px 8px rgba(15, 23, 42, .06); }
+.entry-head {
+    display: flex; align-items: center; gap: 4px; padding: 6px 8px 6px 10px;
+    background: #f8fafc; border-bottom: 1px solid transparent; cursor: pointer;
+    user-select: none;
+}
+.entry.open .entry-head { border-bottom-color: var(--border); }
+.entry-title { flex: 1; font-size: .82rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.entry-actions { display: flex; align-items: center; gap: 2px; }
+.entry-body { padding: 12px; display: grid; gap: 10px; }
+.entry:not(.open) .entry-body { display: none; }
+
+.icon-btn {
+    border: none; background: transparent; color: var(--muted);
+    width: 26px; height: 26px; border-radius: 6px; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: background .15s, color .15s; flex-shrink: 0; padding: 0;
+}
+.icon-btn:hover { background: #e2e8f0; color: var(--text); }
+.icon-btn.danger:hover { background: #fee2e2; color: #dc2626; }
+.icon-btn .chev { transition: transform .2s; }
+.entry:not(.open) .icon-btn .chev { transform: rotate(-90deg); }
+
+.sub-head {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-top: 2px; padding-top: 10px; border-top: 1px dashed var(--border);
+}
+.sub-head span { font-size: .74rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.sub-head .btn { padding: 4px 9px; font-size: .74rem; }
+
+.sub-entry {
+    border: 1px solid var(--border); border-left: 3px solid var(--ui-accent);
+    border-radius: 8px; padding: 10px; display: grid; gap: 8px; background: #fcfdfe;
+}
+.sub-entry .entry-head { padding: 0 0 2px 0; background: transparent; }
+
+.footer-actions { display: flex; gap: 8px; justify-content: center; padding: 4px 0 24px; }
+
+.preview-pane {
+    flex: 1; overflow: auto; position: relative;
+    background:
+        radial-gradient(circle at 1px 1px, rgba(15, 23, 42, .07) 1px, transparent 0);
+    background-size: 22px 22px;
+    background-color: #e6eaf1;
+}
+
+.pages-stack {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 28px; padding: 36px 24px 80px;
+}
+
+.a4-page {
+    width: 210mm; height: 297mm; flex-shrink: 0;
+    background: #fff; padding: 16mm 15mm;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, .14), 0 14px 38px rgba(15, 23, 42, .20);
+    border-radius: 2px;
+    overflow: hidden;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+}
+
+.pages-stack.anim .a4-page { animation: pageIn .38s ease both; }
+.pages-stack.anim .a4-page:nth-child(2) { animation-delay: .06s; }
+.pages-stack.anim .a4-page:nth-child(3) { animation-delay: .12s; }
+.pages-stack.anim .a4-page:nth-child(n+4) { animation-delay: .18s; }
+@keyframes pageIn {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: none; }
+}
+
+.page-pill {
+    position: sticky; top: 12px; margin-left: auto; margin-right: 16px;
+    width: fit-content; z-index: 5;
+    background: rgba(15, 23, 42, .82); color: #fff; backdrop-filter: blur(4px);
+    font-size: .75rem; font-weight: 600; padding: 5px 12px; border-radius: 999px;
+}
+
+.page-content { height: 100%; position: relative; }
+.page-content > *:first-child { margin-top: 0 !important; }
+
+.page-content {
+    font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: #111827; font-size: 10.5pt; line-height: 1.45;
+}
+
+.r-header {
+    display: flex; align-items: center; gap: 7mm;
+    padding-bottom: 6mm; margin-bottom: 6mm;
+    border-bottom: 2.5px solid var(--accent);
+    break-inside: avoid; page-break-inside: avoid;
+}
+.r-photo {
+    width: 26mm; height: 32mm; object-fit: cover;
+    border-radius: 2.5mm; flex-shrink: 0;
+    box-shadow: 0 0 0 1px var(--accent-line);
+}
+.r-head-main { min-width: 0; }
+.r-name { font-size: 22pt; font-weight: 700; margin: 0; color: #111827; letter-spacing: .02em; line-height: 1.15; }
+.r-contact { font-size: 9.5pt; color: #374151; margin-top: 1.6mm; }
+.r-contact:empty { display: none; }
+
+.r-title {
+    font-size: 11.5pt; text-transform: uppercase; letter-spacing: .12em;
+    color: var(--accent); font-weight: 700;
+    margin: 6.5mm 0 3.2mm; padding-bottom: 1.4mm;
+    border-bottom: 1.5px solid var(--accent-line);
+    break-after: avoid; page-break-after: avoid;
+}
+.r-title.page-break-before { break-before: page; page-break-before: always; }
+
+.r-item {
+    display: flex; gap: 5mm; margin-bottom: 4.2mm;
+    break-inside: avoid; page-break-inside: avoid;
+}
+.r-date {
+    flex: 0 0 31mm; font-weight: 600; color: var(--accent);
+    font-size: 9.5pt; padding-top: .5mm; white-space: pre-line;
+}
+.r-body { flex: 1; min-width: 0; }
+.r-item-title { font-weight: 700; color: #111827; font-size: 10.5pt; }
+.r-sub { color: #4b5563; font-size: 9.5pt; margin-top: .5mm; }
+.r-sub:empty { display: none; }
+
+.r-projects { margin: 1.6mm 0 0; padding-left: 4.5mm; }
+.r-projects li { margin-bottom: 1.4mm; font-size: 9.5pt; break-inside: avoid; }
+.r-proj-title { font-weight: 600; color: #111827; }
+.r-proj-date { color: #6b7280; font-size: 9pt; }
+.r-proj-desc { color: #374151; margin-top: .4mm; white-space: pre-line; }
+
+.r-desc { color: #374151; font-size: 9.8pt; margin-top: 1.2mm; white-space: pre-line; }
+
+.r-skill-cat { margin-bottom: 3.5mm; break-inside: avoid; page-break-inside: avoid; }
+.r-skill-label { font-weight: 700; font-size: 9.5pt; color: #1f2937; margin-bottom: 1.4mm; }
+.r-tags { display: flex; flex-wrap: wrap; gap: 1.6mm; }
+.r-tag {
+    background: var(--accent-soft); color: var(--accent);
+    border: 1px solid var(--accent-line);
+    padding: .6mm 2.6mm; border-radius: 999px; font-size: 8.8pt; font-weight: 600;
+}
+
+.r-empty {
+    height: 100%; display: flex; align-items: center; justify-content: center;
+    color: #9ca3af; font-size: 11pt; text-align: center; padding: 0 20mm;
+}
+
+.measure-page {
+    position: absolute; left: -10000px; top: 0;
+    width: 210mm; height: 297mm; padding: 16mm 15mm;
+    box-sizing: border-box; visibility: hidden; pointer-events: none;
+}
+
+.pages-stack.exporting { gap: 0; padding: 0; display: block; }
+.pages-stack.exporting .a4-page {
+    box-shadow: none; border-radius: 0; animation: none; margin: 0 auto;
+    break-after: page; page-break-after: always;
+}
+.pages-stack.exporting .a4-page:last-child { break-after: auto; page-break-after: auto; }
+
+@media (max-width: 1024px) {
+    .app { flex-direction: column; height: auto; overflow: visible; }
+    body { overflow: auto; }
+    .editor { width: 100%; min-width: 0; border-right: none; border-bottom: 1px solid var(--border); }
+    .preview-pane { min-height: 60vh; }
+}
+
+@media print {
+    @page { size: A4; margin: 0; }
+    html, body { background: #fff; height: auto; overflow: visible; }
+    .topbar, .editor, .page-pill, .measure-page { display: none !important; }
+    .app { display: block; height: auto; overflow: visible; }
+    .preview-pane { overflow: visible; background: none; }
+    .pages-stack { zoom: 1 !important; gap: 0; padding: 0; display: block; }
+    .a4-page {
+        box-shadow: none; border-radius: 0; margin: 0;
+        animation: none; break-after: page; page-break-after: always;
+    }
+    .a4-page:last-child { break-after: auto; page-break-after: auto; }
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+    <div class="brand">
+        <div class="brand-mark">CV</div>
+        <div>
+            <h1>Lebenslauf-Generator</h1>
+            <span>Live-Vorschau auf A4-Seiten</span>
+        </div>
+    </div>
+    <div class="toolbar">
+        <div class="zoom-group" title="Zoom">
+            <button id="zoomOut" title="Verkleinern">&minus;</button>
+            <span class="zoom-label" id="zoomLabel">100%</span>
+            <button id="zoomIn" title="Vergr&ouml;&szlig;ern">+</button>
+        </div>
+        <div class="divider"></div>
+        <button class="btn icon-only" id="printBtn" title="Drucken (Strg+P)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        </button>
+        <button class="btn primary" id="pdfBtn">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            PDF exportieren
+        </button>
+        <button class="btn" id="xmlExportBtn">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            XML speichern
+        </button>
+        <button class="btn" id="xmlImportBtn">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            XML &ouml;ffnen
+        </button>
+    </div>
+</header>
+
+<div class="app">
+    <aside class="editor" id="editor"></aside>
+    <main class="preview-pane" id="previewPane">
+        <div class="page-pill" id="pagePill">1 Seite</div>
+        <div class="pages-stack" id="pagesStack"></div>
+    </main>
+</div>
+
+<div class="measure-page" aria-hidden="true">
+    <div class="page-content" id="measureContent"></div>
+</div>
+
+<input type="file" id="photoInput" accept="image/*" hidden>
+<input type="file" id="xmlInput" accept=".xml,text/xml" hidden>
+
+<script>
+const STORAGE_KEY = 'lebenslauf-generator-v8';
+const uid = () => 'id_' + Math.random().toString(36).slice(2, 10);
+
+function defaultState() {
+    return {
+        personal: { vorname: '', nachname: '', strasse: '', plz: '', ort: '', telefon: '', email: '', geburtsdatum: '', image: '' },
+        experiences: [],
+        educations: [],
+        personalProjects: [],
+        skills: { languages: '', it: '', tools: '' },
+        settings: { accent: '#2563eb', breakBeforeEducation: true }
+    };
+}
+
+let state = defaultState();
+let zoom = 1;
+let lastPageCount = 0;
+const collapsed = new Set();
+
+const I = {
+    up: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15l-6-6-6 6"/></svg>',
+    down: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
+    trash: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>',
+    plus: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+    chev: '<svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
+    image: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>'
+};
+
+function esc(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function escapeXML(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;');
+}
+
+function hexToRgb(hex) {
+    const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(String(hex).trim());
+    if (!m) return { r: 37, g: 99, b: 235 };
+    return { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) };
+}
+
+function setAccent(color) {
+    const c = hexToRgb(color);
+    const root = document.documentElement.style;
+    root.setProperty('--accent', color);
+    root.setProperty('--accent-soft', 'rgba(' + c.r + ', ' + c.g + ', ' + c.b + ', 0.16)');
+    root.setProperty('--accent-line', 'rgba(' + c.r + ', ' + c.g + ', ' + c.b + ', 0.6)');
+}
+
+function setByPath(path, value) {
+    const p = path.split('.');
+    if (p[0] === 'p') state.personal[p[1]] = value;
+    else if (p[0] === 'sk') state.skills[p[1]] = value;
+    else if (p[0] === 'st') state.settings[p[1]] = value;
+    else if (p[0] === 'exp') state.experiences[+p[1]][p[2]] = value;
+    else if (p[0] === 'edu') state.educations[+p[1]][p[2]] = value;
+    else if (p[0] === 'pp') state.personalProjects[+p[1]][p[2]] = value;
+    else if (p[0] === 'px') {
+        const arr = p[1] === 'exp' ? state.experiences[+p[2]].projects : state.educations[+p[2]].projects;
+        arr[+p[3]][p[4]] = value;
+    }
+}
+
+const field = (label, path, value, placeholder, type) =>
+    '<label class="field"><span>' + label + '</span>' +
+    '<input type="' + (type || 'text') + '" data-path="' + path + '" value="' + esc(value) + '" placeholder="' + esc(placeholder || '') + '"></label>';
+
+const area = (label, path, value, placeholder, rows) =>
+    '<label class="field"><span>' + label + '</span>' +
+    '<textarea data-path="' + path + '" rows="' + (rows || 3) + '" placeholder="' + esc(placeholder || '') + '">' + esc(value) + '</textarea></label>';
+
+const gap = () => '<div style="height:10px;"></div>';
+
+function projCard(kind, i, j, p) {
+    return '<div class="sub-entry">' +
+        '<div class="entry-head" style="cursor:default;">' +
+            '<span class="entry-title">' + esc(p.title) + '</span>' +
+            '<span class="entry-actions">' +
+                '<button class="icon-btn" data-act="movep:' + kind + ':' + i + ':' + j + ':up" title="Nach oben">' + I.up + '</button>' +
+                '<button class="icon-btn" data-act="movep:' + kind + ':' + i + ':' + j + ':down" title="Nach unten">' + I.down + '</button>' +
+                '<button class="icon-btn danger" data-act="delp:' + kind + ':' + i + ':' + j + '" title="L&ouml;schen">' + I.trash + '</button>' +
+            '</span>' +
+        '</div>' +
+        '<div class="grid2">' +
+            field('Projektname', 'px.' + kind + '.' + i + '.' + j + '.title', p.title, 'z.B. Smart Home App') +
+            field('Zeitraum (optional)', 'px.' + kind + '.' + i + '.' + j + '.date', p.date, 'z.B. Q1 2024') +
+        '</div>' +
+        area('Beschreibung (optional)', 'px.' + kind + '.' + i + '.' + j + '.desc', p.desc, 'Kurze Beschreibung', 2) +
+    '</div>';
+}
+
+function entryCard(kind, i, e, title, body, subLabel) {
+    const open = !collapsed.has(e.id);
+    const projects = e.projects || [];
+    return '<div class="entry ' + (open ? 'open' : '') + '" data-id="' + e.id + '">' +
+        '<div class="entry-head" data-act="toggle:' + kind + ':' + i + '">' +
+            '<button class="icon-btn" tabindex="-1" title="Ein-/Ausklappen">' + I.chev + '</button>' +
+            '<span class="entry-title">' + esc(title) + '</span>' +
+            '<span class="entry-actions">' +
+                '<button class="icon-btn" data-act="move:' + kind + ':' + i + ':up" title="Nach oben">' + I.up + '</button>' +
+                '<button class="icon-btn" data-act="move:' + kind + ':' + i + ':down" title="Nach unten">' + I.down + '</button>' +
+                '<button class="icon-btn danger" data-act="del:' + kind + ':' + i + '" title="L&ouml;schen">' + I.trash + '</button>' +
+            '</span>' +
+        '</div>' +
+        '<div class="entry-body">' + body +
+            (subLabel ?
+                '<div class="sub-head"><span>' + subLabel + '</span>' +
+                    '<button class="btn" data-act="addp:' + kind + ':' + i + '">' + I.plus + ' Hinzuf&uuml;gen</button>' +
+                '</div>' +
+                projects.map((p, j) => projCard(kind, i, j, p)).join('')
+            : '') +
+        '</div>' +
+    '</div>';
+}
+
+function renderEditor() {
+    const p = state.personal;
+    const editor = document.getElementById('editor');
+
+    const personalBody =
+        '<div class="photo-row">' +
+            (p.image
+                ? '<img class="photo-thumb" src="' + esc(p.image) + '" alt="Profilbild">'
+                : '<div class="photo-placeholder">' + I.image + '</div>') +
+            '<div style="display:flex; flex-direction:column; gap:6px;">' +
+                '<button class="btn" data-act="photo" style="align-self:flex-start;">' + (p.image ? 'Foto ersetzen' : 'Foto hochladen') + '</button>' +
+                (p.image ? '<button class="btn" data-act="photo-del" style="align-self:flex-start;">Foto entfernen</button>' : '') +
+            '</div>' +
+        '</div>' +
+        '<div class="grid2">' +
+            field('Vorname', 'p.vorname', p.vorname, 'Max') +
+            field('Nachname', 'p.nachname', p.nachname, 'Mustermann') +
+        '</div>' + gap() +
+        field('Stra&szlig;e &amp; Hausnummer', 'p.strasse', p.strasse, 'Musterstra&szlig;e 12a') + gap() +
+        '<div class="grid2">' +
+            field('PLZ', 'p.plz', p.plz, '12345') +
+            field('Ort', 'p.ort', p.ort, 'Musterstadt') +
+        '</div>' + gap() +
+        '<div class="grid2">' +
+            field('Telefonnummer', 'p.telefon', p.telefon, '+49 123 456789', 'tel') +
+            field('E-Mail-Adresse', 'p.email', p.email, 'max@example.com', 'email') +
+        '</div>' + gap() +
+        field('Geburtsdatum', 'p.geburtsdatum', p.geburtsdatum, 'z.B. 15.08.1998') +
+        '<div class="grid2" style="margin-top:12px; align-items:end;">' +
+            '<label class="field"><span>Akzentfarbe</span>' +
+                '<input type="color" data-path="st.accent" value="' + esc(state.settings.accent) + '"></label>' +
+            '<label class="check" style="padding-bottom:8px;">' +
+                '<input type="checkbox" data-path="st.breakBeforeEducation"' + (state.settings.breakBeforeEducation ? ' checked' : '') + '>' +
+                'Ausbildung auf neuer Seite' +
+            '</label>' +
+        '</div>';
+
+    const expCards = state.experiences.map((e, i) => {
+        const title = [e.role, e.company].filter(Boolean).join(' \u00b7 ') || 'Neue Station';
+        const body =
+            field('Arbeitgeber / Firma', 'exp.' + i + '.company', e.company, 'Muster GmbH') + gap() +
+            field('Position', 'exp.' + i + '.role', e.role, 'z.B. Softwareentwickler') + gap() +
+            '<div class="grid2">' +
+                field('Zeitraum', 'exp.' + i + '.date', e.date, 'z.B. 2022 - Heute') +
+                field('Ort', 'exp.' + i + '.location', e.location, 'z.B. Berlin') +
+            '</div>';
+        return entryCard('exp', i, e, title, body, 'Projekte');
+    }).join('');
+
+    const eduCards = state.educations.map((e, i) => {
+        const title = [e.degree, e.school].filter(Boolean).join(' \u00b7 ') || 'Neue Ausbildung';
+        const body =
+            field('Institution / Schule / Universit&auml;t', 'edu.' + i + '.school', e.school, 'Hochschule Musterstadt') + gap() +
+            field('Abschluss / Studienrichtung', 'edu.' + i + '.degree', e.degree, 'z.B. B.Sc. Informatik') + gap() +
+            '<div class="grid2">' +
+                field('Zeitraum', 'edu.' + i + '.date', e.date, 'z.B. 2018 - 2021') +
+                field('Ort', 'edu.' + i + '.location', e.location, 'z.B. Hamburg') +
+            '</div>' + gap() +
+            field('Note / ECTS (optional)', 'edu.' + i + '.grade', e.grade, 'z.B. Note: 1,3');
+        return entryCard('edu', i, e, title, body, 'Projekte / Schwerpunkte');
+    }).join('');
+
+    const ppCards = state.personalProjects.map((e, i) => {
+        const body =
+            field('Projektname', 'pp.' + i + '.title', e.title, 'z.B. Smart Home App') + gap() +
+            field('Technologien / Zweck', 'pp.' + i + '.subtitle', e.subtitle, 'z.B. Flutter, Firebase, IoT') + gap() +
+            '<div class="grid2">' +
+                field('Zeitraum', 'pp.' + i + '.date', e.date, 'z.B. 2023') +
+                field('Link / GitHub (optional)', 'pp.' + i + '.link', e.link, 'github.com/...') +
+            '</div>' + gap() +
+            area('Beschreibung', 'pp.' + i + '.desc', e.desc, 'Kurze Beschreibung des Projekts');
+        return entryCard('pp', i, e, e.title || 'Neues Projekt', body, '');
+    }).join('');
+
+    editor.innerHTML =
+        '<section class="panel">' +
+            '<div class="panel-head"><h2>Pers&ouml;nliche Daten</h2></div>' +
+            personalBody +
+        '</section>' +
+
+        '<section class="panel">' +
+            '<div class="panel-head"><h2>Berufserfahrung</h2>' +
+                '<button class="btn" data-act="add:exp">' + I.plus + ' Hinzuf&uuml;gen</button></div>' +
+            (expCards || '<p class="panel-hint">Noch keine Eintr&auml;ge. F&uuml;ge deine beruflichen Stationen hinzu.</p>') +
+        '</section>' +
+
+        '<section class="panel">' +
+            '<div class="panel-head"><h2>Ausbildung</h2>' +
+                '<button class="btn" data-act="add:edu">' + I.plus + ' Hinzuf&uuml;gen</button></div>' +
+            (eduCards || '<p class="panel-hint">Noch keine Eintr&auml;ge. F&uuml;ge deine Ausbildungsstationen hinzu.</p>') +
+        '</section>' +
+
+        '<section class="panel">' +
+            '<div class="panel-head"><h2>Eigene / Private Projekte</h2>' +
+                '<button class="btn" data-act="add:pp">' + I.plus + ' Hinzuf&uuml;gen</button></div>' +
+            (ppCards || '<p class="panel-hint">Eigene Projekte erscheinen nur im Lebenslauf, wenn sie ausgef&uuml;llt sind.</p>') +
+        '</section>' +
+
+        '<section class="panel">' +
+            '<div class="panel-head"><h2>Fertigkeiten &amp; Skills</h2></div>' +
+            field('Fremdsprachen (kommagetrennt)', 'sk.languages', state.skills.languages, 'Deutsch (Muttersprache), Englisch (C1)') + gap() +
+            field('IT-Skills (kommagetrennt)', 'sk.it', state.skills.it, 'Python, JavaScript, SQL') + gap() +
+            field('Tools &amp; Frameworks (kommagetrennt)', 'sk.tools', state.skills.tools, 'Git, Docker, Excel') +
+        '</section>' +
+
+        '<div class="footer-actions">' +
+            '<button class="btn" data-act="demo">Beispieldaten laden</button>' +
+            '<button class="btn" data-act="reset">Alles zur&uuml;cksetzen</button>' +
+        '</div>';
+}
+
+function projectsListHTML(projects) {
+    const items = (projects || []).filter(p => p.title).map(p =>
+        '<li>' +
+            '<span class="r-proj-title">' + esc(p.title) + '</span>' +
+            (p.date ? ' <span class="r-proj-date">\u00b7 ' + esc(p.date) + '</span>' : '') +
+            (p.desc ? '<div class="r-proj-desc">' + esc(p.desc) + '</div>' : '') +
+        '</li>').join('');
+    return items ? '<ul class="r-projects">' + items + '</ul>' : '';
+}
+
+function buildResumeHTML() {
+    const p = state.personal;
+    const name = [p.vorname, p.nachname].filter(Boolean).join(' ');
+    const addr = [p.strasse, [p.plz, p.ort].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+    const line1 = [addr, p.geburtsdatum ? 'Geb. ' + p.geburtsdatum : ''].filter(Boolean).join('  \u00b7  ');
+    const line2 = [p.telefon ? 'Tel. ' + p.telefon : '', p.email].filter(Boolean).join('  \u00b7  ');
+
+    let h = '';
+    h += '<header class="r-header">' +
+        (p.image ? '<img class="r-photo" src="' + esc(p.image) + '" alt="">' : '') +
+        '<div class="r-head-main">' +
+            '<h1 class="r-name">' + (esc(name) || 'Vorname Nachname') + '</h1>' +
+            '<div class="r-contact">' + esc(line1) + '</div>' +
+            '<div class="r-contact">' + esc(line2) + '</div>' +
+        '</div>' +
+    '</header>';
+
+    if (state.experiences.some(e => e.company || e.role || e.date)) {
+        h += '<section><h2 class="r-title">Berufserfahrung</h2>';
+        state.experiences.forEach(e => {
+            if (!(e.company || e.role || e.date)) return;
+            h += '<div class="r-item">' +
+                '<div class="r-date">' + esc(e.date) + '</div>' +
+                '<div class="r-body">' +
+                    '<div class="r-item-title">' + esc(e.role || e.company) + '</div>' +
+                    '<div class="r-sub">' + esc([e.role && e.company ? e.company : '', e.location].filter(Boolean).join(' \u00b7 ')) + '</div>' +
+                    projectsListHTML(e.projects) +
+                '</div>' +
+            '</div>';
+        });
+        h += '</section>';
+    }
+
+    if (state.educations.some(e => e.school || e.degree || e.date)) {
+        const brk = state.settings.breakBeforeEducation ? ' page-break-before' : '';
+        h += '<section><h2 class="r-title' + brk + '">Ausbildung</h2>';
+        state.educations.forEach(e => {
+            if (!(e.school || e.degree || e.date)) return;
+            h += '<div class="r-item">' +
+                '<div class="r-date">' + esc(e.date) + '</div>' +
+                '<div class="r-body">' +
+                    '<div class="r-item-title">' + esc(e.degree || e.school) + '</div>' +
+                    '<div class="r-sub">' + esc([e.degree && e.school ? e.school : '', e.location, e.grade].filter(Boolean).join(' \u00b7 ')) + '</div>' +
+                    projectsListHTML(e.projects) +
+                '</div>' +
+            '</div>';
+        });
+        h += '</section>';
+    }
+
+    if (state.personalProjects.some(x => x.title)) {
+        h += '<section><h2 class="r-title">Eigene Projekte</h2>';
+        state.personalProjects.forEach(x => {
+            if (!x.title) return;
+            h += '<div class="r-item">' +
+                '<div class="r-date">' + esc(x.date) + '</div>' +
+                '<div class="r-body">' +
+                    '<div class="r-item-title">' + esc(x.title) + '</div>' +
+                    '<div class="r-sub">' + esc([x.subtitle, x.link].filter(Boolean).join(' \u00b7 ')) + '</div>' +
+                    (x.desc ? '<div class="r-desc">' + esc(x.desc) + '</div>' : '') +
+                '</div>' +
+            '</div>';
+        });
+        h += '</section>';
+    }
+
+    const cats = [
+        ['Fremdsprachen', state.skills.languages],
+        ['IT-Skills', state.skills.it],
+        ['Tools &amp; Frameworks', state.skills.tools]
+    ];
+    const skillsHtml = cats.map(cat => {
+        const tags = String(cat[1] || '').split(',').map(s => s.trim()).filter(Boolean);
+        if (!tags.length) return '';
+        return '<div class="r-skill-cat">' +
+            '<div class="r-skill-label">' + cat[0] + '</div>' +
+            '<div class="r-tags">' + tags.map(t => '<span class="r-tag">' + esc(t) + '</span>').join('') + '</div>' +
+        '</div>';
+    }).join('');
+    if (skillsHtml) {
+        h += '<section><h2 class="r-title">Skills &amp; Kompetenzen</h2>' + skillsHtml + '</section>';
+    }
+
+    return h;
+}
+
+function collectFlow(root) {
+    const flow = [];
+    Array.from(root.children).forEach(ch => {
+        if (ch.tagName === 'SECTION') {
+            Array.from(ch.children).forEach(child => {
+                flow.push({
+                    el: child,
+                    keep: child.classList.contains('r-title'),
+                    forced: child.classList.contains('page-break-before')
+                });
+            });
+        } else {
+            flow.push({ el: ch, keep: false, forced: false });
+        }
+    });
+    return flow;
+}
+
+function paginate(flow, cap) {
+    const pages = [];
+    let current = [];
+    let pageStart = 0;
+
+    flow.forEach((item, idx) => {
+        const top = item.el.offsetTop;
+        const bottom = top + item.el.offsetHeight;
+        const relBottom = bottom - pageStart;
+        const needsBreak = current.length > 0 && ((idx > 0 && relBottom > cap) || item.forced);
+
+        if (needsBreak) {
+            let carry = null;
+            if (current.length && current[current.length - 1].keep) carry = current.pop();
+            pages.push(current);
+            current = [];
+            if (carry) {
+                current.push(carry);
+                pageStart = carry.el.offsetTop;
+            } else {
+                pageStart = top;
+            }
+        }
+        current.push(item);
+    });
+    if (current.length) pages.push(current);
+    return pages;
+}
+
+function renderPages(pages) {
+    const stack = document.getElementById('pagesStack');
+    stack.innerHTML = '';
+
+    if (!pages.length) {
+        const page = document.createElement('div');
+        page.className = 'a4-page';
+        page.innerHTML = '<div class="page-content"><div class="r-empty">Dein Lebenslauf erscheint hier.<br>F&uuml;lle das Formular links aus oder lade die Beispieldaten.</div></div>';
+        stack.appendChild(page);
+        lastPageCount = 0;
+        updatePagePill(1);
+        return;
+    }
+
+    const changed = pages.length !== lastPageCount;
+    pages.forEach(items => {
+        const page = document.createElement('div');
+        page.className = 'a4-page';
+        const content = document.createElement('div');
+        content.className = 'page-content';
+        items.forEach((it, idx) => {
+            const clone = it.el.cloneNode(true);
+            if (idx === 0) clone.classList.remove('page-break-before');
+            content.appendChild(clone);
+        });
+        page.appendChild(content);
+        stack.appendChild(page);
+    });
+
+    if (changed) {
+        stack.classList.remove('anim');
+        void stack.offsetWidth;
+        stack.classList.add('anim');
+    }
+    lastPageCount = pages.length;
+    updatePagePill(pages.length);
+}
+
+function updatePagePill(n) {
+    document.getElementById('pagePill').textContent = n === 1 ? '1 Seite' : n + ' Seiten';
+}
+
+function rebuildPreview() {
+    const measureContent = document.getElementById('measureContent');
+    measureContent.innerHTML = buildResumeHTML();
+    const flow = collectFlow(measureContent);
+    const cap = measureContent.clientHeight;
+    renderPages(paginate(flow, cap));
+}
+
+let previewTimer, saveTimer;
+function schedulePreview() {
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(rebuildPreview, 120);
+}
+function scheduleSave() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveLocal, 400);
+}
+
+function saveLocal() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+}
+
+function loadLocal() {
+    try {
+        const s = localStorage.getItem(STORAGE_KEY);
+        if (!s) return null;
+        return normalizeState(JSON.parse(s));
+    } catch (e) { return null; }
+}
+
+function normalizeState(s) {
+    const d = defaultState();
+    const withProjects = arr => (arr || []).map(e => {
+        const c = Object.assign({}, e, { id: e.id || uid() });
+        c.projects = (e.projects || []).map(p => Object.assign({ id: uid() }, p));
+        return c;
+    });
+    return {
+        personal: Object.assign({}, d.personal, s.personal || {}),
+        experiences: withProjects(s.experiences),
+        educations: withProjects(s.educations),
+        personalProjects: (s.personalProjects || []).map(e => Object.assign({ id: uid() }, e)),
+        skills: Object.assign({}, d.skills, s.skills || {}),
+        settings: Object.assign({}, d.settings, s.settings || {})
+    };
+}
+
+function setZoom(z) {
+    zoom = Math.min(1.5, Math.max(0.4, z));
+    document.getElementById('pagesStack').style.zoom = zoom;
+    document.getElementById('zoomLabel').textContent = Math.round(zoom * 100) + '%';
+}
+
+function fitZoom() {
+    const pane = document.getElementById('previewPane');
+    const w = pane.clientWidth - 80;
+    setZoom(Math.min(1, Math.max(0.4, w / 794)));
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function fileBaseName() {
+    const p = state.personal;
+    return ([p.nachname, p.vorname].filter(Boolean).join('_') || 'Lebenslauf') + '_Lebenslauf';
+}
+
+function parseColorRGBA(str) {
+    const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/.exec(str || '');
+    if (!m) return null;
+    return { r: +m[1], g: +m[2], b: +m[3], a: m[4] === undefined ? 1 : +m[4] };
+}
+
+function overWhite(c) {
+    const a = c.a === undefined ? 1 : c.a;
+    return [Math.round(c.r * a + 255 * (1 - a)), Math.round(c.g * a + 255 * (1 - a)), Math.round(c.b * a + 255 * (1 - a))];
+}
+
+function drawVectorPage(pdf, pageEl) {
+    const mm = 25.4 / 96;
+    const pageRect = pageEl.getBoundingClientRect();
+    const rel = el => {
+        const r = el.getBoundingClientRect();
+        return { x: (r.left - pageRect.left) * mm, y: (r.top - pageRect.top) * mm, w: r.width * mm, h: r.height * mm };
+    };
+
+    const textClasses = ['r-name', 'r-contact', 'r-date', 'r-item-title', 'r-sub', 'r-desc', 'r-proj-desc', 'r-skill-label'];
+
+    function textEl(el, forceUpper) {
+        const cs = getComputedStyle(el);
+        const raw = forceUpper ? el.textContent.toUpperCase() : el.textContent;
+        const text = raw.replace(/\s+/g, ' ').trim();
+        if (!text) return;
+        const b = rel(el);
+        const fsPx = parseFloat(cs.fontSize);
+        const lhPx = parseFloat(cs.lineHeight) || fsPx * 1.45;
+        const col = parseColorRGBA(cs.color) || { r: 17, g: 24, b: 39, a: 1 };
+        pdf.setTextColor(col.r, col.g, col.b);
+        pdf.setFont('helvetica', parseInt(cs.fontWeight, 10) >= 600 ? 'bold' : 'normal');
+        pdf.setFontSize(fsPx * 0.75);
+        const lines = pdf.splitTextToSize(text, Math.max(b.w, 5));
+        const lead = (lhPx - fsPx) / 2 * mm;
+        const ls = parseFloat(cs.letterSpacing) || 0;
+        lines.forEach((ln, i) => {
+            const opts = { baseline: 'top' };
+            if (ls > 0) opts.charSpace = ls * mm;
+            pdf.text(ln, b.x, b.y + lead + i * lhPx * mm, opts);
+        });
+    }
+
+    function drawBorderBottom(el) {
+        const cs = getComputedStyle(el);
+        const wPx = parseFloat(cs.borderBottomWidth);
+        const col = parseColorRGBA(cs.borderBottomColor);
+        if (!wPx || !col || col.a === 0) return;
+        const b = rel(el);
+        const f = overWhite(col);
+        pdf.setDrawColor(f[0], f[1], f[2]);
+        pdf.setLineWidth(wPx * mm);
+        pdf.line(b.x, b.y + b.h - wPx * mm / 2, b.x + b.w, b.y + b.h - wPx * mm / 2);
+    }
+
+    function drawTag(el) {
+        const cs = getComputedStyle(el);
+        const b = rel(el);
+        const bg = parseColorRGBA(cs.backgroundColor);
+        const bd = parseColorRGBA(cs.borderTopColor);
+        if (bg) { const f = overWhite(bg); pdf.setFillColor(f[0], f[1], f[2]); }
+        if (bd) { const s = overWhite(bd); pdf.setDrawColor(s[0], s[1], s[2]); }
+        pdf.setLineWidth(0.15);
+        pdf.roundedRect(b.x, b.y, b.w, b.h, b.h / 2, b.h / 2, bg ? 'FD' : 'D');
+        const col = parseColorRGBA(cs.color) || { r: 37, g: 99, b: 235, a: 1 };
+        pdf.setTextColor(col.r, col.g, col.b);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(parseFloat(cs.fontSize) * 0.75);
+        pdf.text(el.textContent.trim(), b.x + b.w / 2, b.y + b.h / 2, { align: 'center', baseline: 'middle' });
+    }
+
+    function drawPhoto(el) {
+        const img = state.personal.image;
+        if (!img) return;
+        const b = rel(el);
+        const fmt = /^data:image\/png/i.test(img) ? 'PNG' : 'JPEG';
+        pdf.addImage(img, fmt, b.x, b.y, b.w, b.h);
+    }
+
+    function drawLi(el) {
+        const b = rel(el);
+        const title = el.querySelector('.r-proj-title');
+        const date = el.querySelector('.r-proj-date');
+        const desc = el.querySelector('.r-proj-desc');
+        const fsPx = title ? parseFloat(getComputedStyle(title).fontSize) : 9.5 / 0.75;
+        const lhPx = fsPx * 1.45;
+        const lead = (lhPx - fsPx) / 2 * mm;
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(9.5 * 0.75);
+        pdf.setTextColor(55, 65, 81);
+        pdf.text('\u2022', b.x - 2.2, b.y + lead, { baseline: 'top' });
+        if (title) textEl(title, false);
+        if (date) textEl(date, false);
+        if (desc) textEl(desc, false);
+    }
+
+    function walk(el) {
+        const cl = el.classList;
+        if (cl.contains('r-photo')) return drawPhoto(el);
+        if (cl.contains('r-tag')) return drawTag(el);
+        if (el.tagName === 'LI') return drawLi(el);
+        if (textClasses.some(c => cl.contains(c))) return textEl(el, false);
+        if (cl.contains('r-title')) { textEl(el, true); return drawBorderBottom(el); }
+        if (cl.contains('r-header')) { walkChildren(el); return drawBorderBottom(el); }
+        walkChildren(el);
+    }
+
+    function walkChildren(el) {
+        Array.from(el.children).forEach(walk);
+    }
+
+    walkChildren(pageEl);
+}
+
+async function exportPDF() {
+    const stack = document.getElementById('pagesStack');
+    const pages = Array.from(stack.querySelectorAll('.a4-page'));
+    if (!pages.length) return;
+    const btn = document.getElementById('pdfBtn');
+    btn.disabled = true;
+    const prevZoom = zoom;
+    stack.style.removeProperty('zoom');
+    await sleep(120);
+    let ok = false;
+    try {
+        if (window.jspdf) {
+            try {
+                const pdf = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true });
+                for (let i = 0; i < pages.length; i++) {
+                    if (i > 0) pdf.addPage();
+                    drawVectorPage(pdf, pages[i]);
+                }
+                pdf.save(fileBaseName() + '.pdf');
+                ok = true;
+            } catch (e) {
+                ok = false;
+            }
+        }
+        if (!ok && window.html2canvas && window.jspdf) {
+            const pdf = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+            for (let i = 0; i < pages.length; i++) {
+                const canvas = await html2canvas(pages[i], { scale: 3, useCORS: true, backgroundColor: '#ffffff', logging: false });
+                const img = canvas.toDataURL('image/png');
+                if (i > 0) pdf.addPage();
+                pdf.addImage(img, 'PNG', 0, 0, 210, 297);
+            }
+            pdf.save(fileBaseName() + '.pdf');
+            ok = true;
+        }
+        if (!ok && window.html2pdf) {
+            stack.classList.add('exporting');
+            await sleep(120);
+            await html2pdf().set({
+                margin: 0,
+                filename: fileBaseName() + '.pdf',
+                image: { type: 'png' },
+                html2canvas: { scale: 2, useCORS: true },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+                pagebreak: { mode: ['css', 'legacy'] }
+            }).from(stack).save();
+            ok = true;
+        }
+        if (!ok) throw new Error('PDF-Bibliothek nicht geladen');
+    } catch (e) {
+        alert('PDF-Export fehlgeschlagen (' + e.message + ').\nBitte nutze den Druckdialog (Drucken-Button), um als PDF zu speichern.');
+    } finally {
+        stack.classList.remove('exporting');
+        setZoom(prevZoom);
+        btn.disabled = false;
+    }
+}
+
+function exportXML() {
+    const s = state;
+    let x = '<?xml version="1.0" encoding="UTF-8"?>\n<resume>\n';
+    x += '  <personal>\n';
+    ['vorname', 'nachname', 'strasse', 'plz', 'ort', 'telefon', 'email', 'geburtsdatum'].forEach(k => {
+        x += '    <' + k + '>' + escapeXML(s.personal[k]) + '</' + k + '>\n';
+    });
+    x += '    <image>' + s.personal.image + '</image>\n';
+    x += '  </personal>\n';
+
+    const projectsXML = projects => {
+        let out = '      <projects>\n';
+        (projects || []).forEach(p => {
+            out += '        <project>\n';
+            out += '          <title>' + escapeXML(p.title) + '</title>\n';
+            out += '          <date>' + escapeXML(p.date) + '</date>\n';
+            out += '          <desc>' + escapeXML(p.desc) + '</desc>\n';
+            out += '        </project>\n';
+        });
+        return out + '      </projects>\n';
+    };
+
+    x += '  <experiences>\n';
+    s.experiences.forEach(e => {
+        x += '    <experience>\n';
+        x += '      <company>' + escapeXML(e.company) + '</company>\n';
+        x += '      <role>' + escapeXML(e.role) + '</role>\n';
+        x += '      <date>' + escapeXML(e.date) + '</date>\n';
+        x += '      <location>' + escapeXML(e.location) + '</location>\n';
+        x += projectsXML(e.projects);
+        x += '    </experience>\n';
+    });
+    x += '  </experiences>\n';
+
+    x += '  <educations>\n';
+    s.educations.forEach(e => {
+        x += '    <education>\n';
+        x += '      <school>' + escapeXML(e.school) + '</school>\n';
+        x += '      <degree>' + escapeXML(e.degree) + '</degree>\n';
+        x += '      <date>' + escapeXML(e.date) + '</date>\n';
+        x += '      <location>' + escapeXML(e.location) + '</location>\n';
+        x += '      <grade>' + escapeXML(e.grade) + '</grade>\n';
+        x += projectsXML(e.projects);
+        x += '    </education>\n';
+    });
+    x += '  </educations>\n';
+
+    x += '  <personalProjects>\n';
+    s.personalProjects.forEach(p => {
+        x += '    <personalProject>\n';
+        x += '      <title>' + escapeXML(p.title) + '</title>\n';
+        x += '      <subtitle>' + escapeXML(p.subtitle) + '</subtitle>\n';
+        x += '      <date>' + escapeXML(p.date) + '</date>\n';
+        x += '      <link>' + escapeXML(p.link) + '</link>\n';
+        x += '      <desc>' + escapeXML(p.desc) + '</desc>\n';
+        x += '    </personalProject>\n';
+    });
+    x += '  </personalProjects>\n';
+
+    x += '  <skills>\n';
+    x += '    <languages>' + escapeXML(s.skills.languages) + '</languages>\n';
+    x += '    <it>' + escapeXML(s.skills.it) + '</it>\n';
+    x += '    <tools>' + escapeXML(s.skills.tools) + '</tools>\n';
+    x += '  </skills>\n';
+    x += '</resume>';
+
+    const blob = new Blob([x], { type: 'text/xml' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = fileBaseName() + '.xml';
+    a.click();
+    URL.revokeObjectURL(a.href);
+}
+
+function importXMLFile(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+        try {
+            const doc = new DOMParser().parseFromString(e.target.result, 'text/xml');
+            if (doc.getElementsByTagName('parsererror').length) throw new Error('Keine g&uuml;ltige XML-Datei'.replace('&uuml;', '\u00fc'));
+
+            const g = (el, tag) => {
+                const n = el.getElementsByTagName(tag)[0];
+                return n ? n.textContent : '';
+            };
+            const root = doc.getElementsByTagName('resume')[0] || doc;
+
+            state.personal = {
+                vorname: g(root, 'vorname'), nachname: g(root, 'nachname'),
+                strasse: g(root, 'strasse'), plz: g(root, 'plz'), ort: g(root, 'ort'),
+                telefon: g(root, 'telefon'), email: g(root, 'email'),
+                geburtsdatum: g(root, 'geburtsdatum'),
+                image: (root.getElementsByTagName('image')[0] ? root.getElementsByTagName('image')[0].textContent : '').trim()
+            };
+
+            const readProjects = parent => Array.from(parent.getElementsByTagName('project')).map(p => ({
+                id: uid(), title: g(p, 'title'), date: g(p, 'date'), desc: g(p, 'desc')
+            }));
+
+            state.experiences = Array.from(root.getElementsByTagName('experience')).map(ex => ({
+                id: uid(),
+                company: g(ex, 'company'), role: g(ex, 'role'),
+                date: g(ex, 'date'), location: g(ex, 'location'),
+                projects: readProjects(ex)
+            }));
+
+            state.educations = Array.from(root.getElementsByTagName('education')).map(ed => ({
+                id: uid(),
+                school: g(ed, 'school'), degree: g(ed, 'degree'),
+                date: g(ed, 'date'), location: g(ed, 'location'), grade: g(ed, 'grade'),
+                projects: readProjects(ed)
+            }));
+
+            state.personalProjects = Array.from(root.getElementsByTagName('personalProject')).map(p => ({
+                id: uid(),
+                title: g(p, 'title'), subtitle: g(p, 'subtitle'),
+                date: g(p, 'date'), link: g(p, 'link'), desc: g(p, 'desc')
+            }));
+
+            state.skills = {
+                languages: g(root, 'languages'),
+                it: g(root, 'it'),
+                tools: g(root, 'tools')
+            };
+
+            collapsed.clear();
+            setAccent(state.settings.accent);
+            renderEditor();
+            rebuildPreview();
+            saveLocal();
+        } catch (err) {
+            alert('Import fehlgeschlagen: ' + err.message);
+        }
+    };
+    reader.readAsText(file);
+}
+
+function loadDemo() {
+    state = defaultState();
+    state.personal = {
+        vorname: 'Riccardo', nachname: 'Muster',
+        strasse: 'Musterstra\u00dfe 12a', plz: '12345', ort: 'Musterstadt',
+        telefon: '+49 123 456789', email: 'riccardo@example.com',
+        geburtsdatum: '15.08.1998', image: ''
+    };
+    state.experiences = [
+        {
+            id: uid(), company: 'TechNova GmbH', role: 'Werkstudent Softwareentwicklung',
+            date: '03/2022 - heute', location: 'Berlin',
+            projects: [{ id: uid(), title: 'Interne Reporting-Plattform', date: 'Q1 2024', desc: 'Automatisierte Berichte mit Python und Power BI f\u00fcr alle Fachabteilungen.' }]
+        },
+        {
+            id: uid(), company: 'Muster Logistik AG', role: 'Praktikant IT-Support',
+            date: '07/2021 - 09/2021', location: 'Hamburg',
+            projects: []
+        }
+    ];
+    state.educations = [
+        {
+            id: uid(), school: 'Hochschule Musterstadt', degree: 'B.Sc. Wirtschaftsinformatik',
+            date: '10/2019 - 09/2023', location: 'Musterstadt', grade: 'Note: 1,7',
+            projects: [{ id: uid(), title: 'Schwerpunkt Datenbanken & Analytics', date: '', desc: '' }]
+        },
+        {
+            id: uid(), school: 'Stadtgymnasium Musterstadt', degree: 'Abitur',
+            date: '2010 - 2019', location: 'Musterstadt', grade: '',
+            projects: []
+        }
+    ];
+    state.personalProjects = [
+        {
+            id: uid(), title: 'Smart Home App', subtitle: 'Flutter, Firebase, IoT',
+            date: '2023', link: 'github.com/username/smart-home',
+            desc: 'App zur Steuerung vernetzter Ger\u00e4te im Haushalt mit Sprachsteuerung und Automatisierungsregeln.'
+        }
+    ];
+    state.skills = {
+        languages: 'Deutsch (Muttersprache), Englisch (C1)',
+        it: 'Python, JavaScript, SQL',
+        tools: 'Git, Docker, Excel, Power BI'
+    };
+    collapsed.clear();
+    renderEditor();
+    rebuildPreview();
+    saveLocal();
+}
+
+document.getElementById('editor').addEventListener('input', e => {
+    const t = e.target;
+    const path = t.dataset && t.dataset.path;
+    if (!path) return;
+    const value = t.type === 'checkbox' ? t.checked : t.value;
+    setByPath(path, value);
+    if (path === 'st.accent') setAccent(value);
+    schedulePreview();
+    scheduleSave();
+});
+
+document.getElementById('editor').addEventListener('click', e => {
+    const head = e.target.closest('.entry-head[data-act^="toggle:"]');
+    if (head && !e.target.closest('[data-act^="move"], [data-act^="del"]')) {
+        const entry = head.closest('.entry');
+        const id = entry ? entry.dataset.id : null;
+        if (id) {
+            if (collapsed.has(id)) collapsed.delete(id); else collapsed.add(id);
+            renderEditor();
+        }
+        return;
+    }
+    const btn = e.target.closest('[data-act]');
+    if (!btn) return;
+    const parts = btn.dataset.act.split(':');
+    const act = parts[0], kind = parts[1], idx = +parts[2], j = +parts[3], dir = parts[4];
+
+    if (act === 'photo') {
+        document.getElementById('photoInput').click();
+        return;
+    }
+    if (act === 'photo-del') {
+        state.personal.image = '';
+        renderEditor();
+        schedulePreview();
+        scheduleSave();
+        return;
+    }
+    if (act === 'demo') {
+        if (confirm('Beispieldaten laden? Die aktuellen Eingaben werden ersetzt.')) loadDemo();
+        return;
+    }
+    if (act === 'reset') {
+        if (confirm('Wirklich alle Eingaben l\u00f6schen?')) {
+            state = defaultState();
+            collapsed.clear();
+            renderEditor();
+            rebuildPreview();
+            saveLocal();
+        }
+        return;
+    }
+
+    const list = kind === 'exp' ? state.experiences : kind === 'edu' ? state.educations : state.personalProjects;
+
+    if (act === 'add') {
+        if (kind === 'exp') state.experiences.unshift({ id: uid(), company: '', role: '', date: '', location: '', projects: [] });
+        else if (kind === 'edu') state.educations.unshift({ id: uid(), school: '', degree: '', date: '', location: '', grade: '', projects: [] });
+        else state.personalProjects.unshift({ id: uid(), title: '', subtitle: '', date: '', link: '', desc: '' });
+    } else if (act === 'del') {
+        list.splice(idx, 1);
+    } else if (act === 'move') {
+        const t = dir === 'up' ? idx - 1 : idx + 1;
+        if (t >= 0 && t < list.length) {
+            const tmp = list[idx];
+            list[idx] = list[t];
+            list[t] = tmp;
+        }
+    } else if (act === 'addp') {
+        list[idx].projects.push({ id: uid(), title: '', date: '', desc: '' });
+    } else if (act === 'delp') {
+        list[idx].projects.splice(j, 1);
+    } else if (act === 'movep') {
+        const arr = list[idx].projects;
+        const t = dir === 'up' ? j - 1 : j + 1;
+        if (t >= 0 && t < arr.length) {
+            const tmp = arr[j];
+            arr[j] = arr[t];
+            arr[t] = tmp;
+        }
+    } else {
+        return;
+    }
+
+    renderEditor();
+    schedulePreview();
+    scheduleSave();
+});
+
+document.getElementById('photoInput').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+        state.personal.image = ev.target.result;
+        renderEditor();
+        schedulePreview();
+        scheduleSave();
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+});
+
+document.getElementById('xmlInput').addEventListener('change', e => {
+    importXMLFile(e.target.files[0]);
+    e.target.value = '';
+});
+
+document.getElementById('xmlImportBtn').addEventListener('click', () => document.getElementById('xmlInput').click());
+document.getElementById('xmlExportBtn').addEventListener('click', exportXML);
+document.getElementById('pdfBtn').addEventListener('click', exportPDF);
+document.getElementById('printBtn').addEventListener('click', () => window.print());
+document.getElementById('zoomIn').addEventListener('click', () => setZoom(zoom + 0.1));
+document.getElementById('zoomOut').addEventListener('click', () => setZoom(zoom - 0.1));
+
+window.addEventListener('resize', () => {
+    clearTimeout(window.__rz);
+    window.__rz = setTimeout(() => rebuildPreview(), 200);
+});
+
+(function init() {
+    const saved = loadLocal();
+    if (saved) state = saved;
+    setAccent(state.settings.accent);
+    renderEditor();
+    fitZoom();
+    rebuildPreview();
+})();
+</script>
+</body>
+</html>
